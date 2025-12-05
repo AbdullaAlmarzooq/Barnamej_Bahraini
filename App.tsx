@@ -1,20 +1,21 @@
+import React, { useEffect } from 'react';
+import { View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AppNavigator from './src/navigation/AppNavigator';
+import { initDatabase } from './src/services/database';
+
+import HomeScreen from './src/screens/HomeScreen';
 
 export default function App() {
+  useEffect(() => {
+    initDatabase();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      {/* <StatusBar style="auto" /> */}
+      <AppNavigator />
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

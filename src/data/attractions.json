@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "name": "Qal'at al-Bahrain",
+    "description": "Ancient harbor and capital of Dilmun, a UNESCO World Heritage Site.",
+    "category": "Historical",
+    "location": "Karbabad",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Qal%27at_al-Bahrain_01.jpg/1200px-Qal%27at_al-Bahrain_01.jpg",
+    "rating": 4.8
+  },
+  {
+    "id": 2,
+    "name": "Bab Al Bahrain",
+    "description": "Historical building located in the Customs Square in Manama.",
+    "category": "Landmark",
+    "location": "Manama",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Bab_Al_Bahrain.jpg/1200px-Bab_Al_Bahrain.jpg",
+    "rating": 4.5
+  },
+  {
+    "id": 3,
+    "name": "Tree of Life",
+    "description": "A 400-year-old tree standing alone in the desert.",
+    "category": "Nature",
+    "location": "Desert",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Tree_of_Life%2C_Bahrain.jpg/1200px-Tree_of_Life%2C_Bahrain.jpg",
+    "rating": 4.2
+  },
+  {
+    "id": 4,
+    "name": "Al Fateh Grand Mosque",
+    "description": "One of the largest mosques in the world, encompassing 6,500 square meters.",
+    "category": "Religious",
+    "location": "Juffair",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Al_Fateh_Grand_Mosque_Bahrain.jpg/1200px-Al_Fateh_Grand_Mosque_Bahrain.jpg",
+    "rating": 4.9
+  },
+  {
+    "id": 5,
+    "name": "Bahrain National Museum",
+    "description": "The largest and one of the oldest public museums in Bahrain.",
+    "category": "Museum",
+    "location": "Manama",
+    "image": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/Bahrain_National_Museum.jpg/1200px-Bahrain_National_Museum.jpg",
+    "rating": 4.7
+  }
+]

@@ -1,0 +1,8 @@
+.itineraries-page {
+    max-width: 1400px;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: var(--space-sm);
+}
