@@ -6,9 +6,10 @@ interface ModalProps {
     title: string;
     children: ReactNode;
     footer?: ReactNode;
+    className?: string;
 }
 
-const Modal = ({ isOpen, onClose, title, children, footer }: ModalProps) => {
+const Modal = ({ isOpen, onClose, title, children, footer, className = '' }: ModalProps) => {
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
@@ -31,7 +32,7 @@ const Modal = ({ isOpen, onClose, title, children, footer }: ModalProps) => {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className={`modal ${className}`} onClick={(e) => e.stopPropagation()}>
                 <div className="modal-header">
                     <h3 className="card-title">{title}</h3>
                     <button

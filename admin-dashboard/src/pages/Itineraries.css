@@ -6,3 +6,7 @@
     display: flex;
     gap: var(--space-sm);
 }
+
+.modal-wide {
+    max-width: 1200px !important;
+}

@@ -107,7 +107,7 @@ const convertAttraction = (attraction) => ({
 
 const convertItineraryAttraction = (attraction) => ({
     ...convertAttraction(attraction),
-    price: Number(attraction.price || 0)
+    price: Number(attraction.attr_price || 0)
 });
 
 // ============================================
@@ -196,7 +196,9 @@ app.get('/itineraries/:id', (req, res) => {
     if (!itinerary) return res.status(404).json({ error: 'Not found' });
 
     const attractions = db.prepare(`
-    SELECT a.*, ia.id as link_id, ia.start_time, ia.end_time, ia.price, ia.notes 
+    SELECT 
+        a.id, a.name, a.description, a.category, a.location, a.image, a.rating, a.price as attr_price,
+        ia.id as link_id, ia.start_time, ia.end_time, ia.notes 
     FROM attractions a 
     JOIN itinerary_attractions ia ON a.id = ia.attraction_id 
     WHERE ia.itinerary_id = ?
@@ -210,6 +212,20 @@ app.post('/itineraries/:id/attractions', (req, res) => {
     const { attraction_id } = req.body;
     const insert = db.prepare('INSERT INTO itinerary_attractions (itinerary_id, attraction_id) VALUES (?, ?)');
     insert.run(req.params.id, attraction_id);
+
+    // Recalculate total
+    const result = db.prepare(`
+        SELECT SUM(a.price) as total 
+        FROM itinerary_attractions ia 
+        JOIN attractions a ON ia.attraction_id = a.id 
+        WHERE ia.itinerary_id = ?
+    `).get(req.params.id);
+
+    console.log('DEBUG: Recalculating total for Itinerary ID:', req.params.id);
+    console.log('DEBUG: Logic Query Result:', JSON.stringify(result));
+
+    db.prepare('UPDATE itineraries SET total_price = ? WHERE id = ?').run(result.total || 0, req.params.id);
+
     res.json({ success: true });
 });
 
@@ -244,15 +260,8 @@ app.put('/itineraries/attractions/:id', (req, res) => {
         db.prepare(query).run(...values);
     }
 
-    // Recalculate total if price changed
-    if (price !== undefined) {
-        const link = db.prepare('SELECT itinerary_id FROM itinerary_attractions WHERE id = ?').get(req.params.id);
-        if (link) {
-            const items = db.prepare('SELECT price FROM itinerary_attractions WHERE itinerary_id = ?').all(link.itinerary_id);
-            const total = items.reduce((sum, item) => sum + (item.price || 0), 0);
-            db.prepare('UPDATE itineraries SET total_price = ? WHERE id = ?').run(total, link.itinerary_id);
-        }
-    }
+    // Recalculate total if needed (though price shouldn't change via this endpoint anymore)
+    // We'll keep it simple and just return success, assuming price is not editable here.
 
     res.json({ success: true });
 });
@@ -262,9 +271,15 @@ app.delete('/itineraries/:id/attractions/:attractionId', (req, res) => {
     db.prepare('DELETE FROM itinerary_attractions WHERE itinerary_id = ? AND attraction_id = ?').run(req.params.id, req.params.attractionId);
 
     // Recalculate total
-    const items = db.prepare('SELECT price FROM itinerary_attractions WHERE itinerary_id = ?').all(req.params.id);
-    const total = items.reduce((sum, item) => sum + (item.price || 0), 0);
-    db.prepare('UPDATE itineraries SET total_price = ? WHERE id = ?').run(total, req.params.id);
+    // Recalculate total
+    const result = db.prepare(`
+        SELECT SUM(a.price) as total 
+        FROM itinerary_attractions ia 
+        JOIN attractions a ON ia.attraction_id = a.id 
+        WHERE ia.itinerary_id = ?
+    `).get(req.params.id);
+
+    db.prepare('UPDATE itineraries SET total_price = ? WHERE id = ?').run(result.total || 0, req.params.id);
 
     res.json({ success: true });
 });

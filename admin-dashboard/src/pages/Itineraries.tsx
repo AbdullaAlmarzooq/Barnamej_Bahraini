@@ -281,6 +281,7 @@ const Itineraries = () => {
                     loadItineraries(); // Refresh on close to ensure strict consistency
                 }}
                 title={editingItinerary ? 'Edit Itinerary' : 'Create Itinerary'}
+                className="modal-wide"
                 footer={
                     <>
                         <button
@@ -415,14 +416,9 @@ const Itineraries = () => {
                                                         />
                                                     </td>
                                                     <td>
-                                                        <input
-                                                            type="number"
-                                                            className="input input-sm"
-                                                            defaultValue={ia.price || 0}
-                                                            min="0"
-                                                            step="0.5"
-                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.link_id, 'price', Number(e.target.value))}
-                                                        />
+                                                        <div className="py-2 text-sm text-center">
+                                                            {ia.price ? `BD ${ia.price.toFixed(3)}` : 'Free'}
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <input
