@@ -32,6 +32,10 @@ export interface Review {
     service_rating: number;
     experience_rating: number;
     created_at: string;
+    age?: number;
+    nationality_id?: number;
+    nationality?: string;
+    attraction_name?: string;
 }
 
 export interface Itinerary {

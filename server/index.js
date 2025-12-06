@@ -135,20 +135,44 @@ app.get('/attractions/:id', (req, res) => {
     res.json(attraction ? convertAttraction(attraction) : null);
 });
 
+// Get all nationalities
+app.get('/nationalities', (req, res) => {
+    const nationalities = db.prepare('SELECT * FROM nationalities ORDER BY name').all();
+    res.json(nationalities);
+});
+
 // Get reviews for attraction
 app.get('/attractions/:id/reviews', (req, res) => {
-    const stmt = db.prepare('SELECT * FROM reviews WHERE attraction_id = ? ORDER BY created_at DESC');
+    const stmt = db.prepare(`
+        SELECT r.*, n.name as nationality 
+        FROM reviews r 
+        LEFT JOIN nationalities n ON r.nationality_id = n.id
+        WHERE r.attraction_id = ? 
+        ORDER BY r.created_at DESC
+    `);
     const reviews = stmt.all(req.params.id);
     res.json(reviews);
 });
 
 // Add review
 app.post('/reviews', (req, res) => {
-    const { attraction_id, name, price_rating, cleanliness_rating, service_rating, experience_rating, comment } = req.body;
-    const insert = db.prepare('INSERT INTO reviews (attraction_id, name, price_rating, cleanliness_rating, service_rating, experience_rating, comment) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    insert.run(attraction_id, name, price_rating, cleanliness_rating, service_rating, experience_rating, comment);
+    const { attraction_id, name, price_rating, cleanliness_rating, service_rating, experience_rating, comment, age, nationality_id } = req.body;
 
-    // Update average rating
+    // Calculate simple average for the review itself if needed, or just insert raw
+    const reviewRating = (price_rating + cleanliness_rating + service_rating + experience_rating) / 4;
+
+    const insert = db.prepare(`
+        INSERT INTO reviews (
+            attraction_id, name, price_rating, cleanliness_rating, service_rating, experience_rating, comment, rating, age, nationality_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    insert.run(
+        attraction_id, name, price_rating, cleanliness_rating, service_rating, experience_rating,
+        comment, reviewRating, age || null, nationality_id || null
+    );
+
+    // Update average rating for attraction
     const reviews = db.prepare('SELECT * FROM reviews WHERE attraction_id = ?').all(attraction_id);
     let totalRating = 0;
     reviews.forEach(r => {
@@ -296,11 +320,13 @@ app.delete('/itineraries/:id', (req, res) => {
 // ============================================
 
 // Get all reviews (admin)
+// Get all reviews (admin)
 app.get('/api/admin/reviews', (req, res) => {
     const reviews = db.prepare(`
-        SELECT r.*, a.name as attraction_name 
+        SELECT r.*, a.name as attraction_name, n.name as nationality 
         FROM reviews r
         LEFT JOIN attractions a ON r.attraction_id = a.id
+        LEFT JOIN nationalities n ON r.nationality_id = n.id
         ORDER BY r.created_at DESC
     `).all();
     res.json(reviews);

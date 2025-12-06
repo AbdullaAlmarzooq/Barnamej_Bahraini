@@ -75,6 +75,14 @@ const Reviews = () => {
                                         <span className="text-muted text-sm ml-sm">
                                             {new Date(review.created_at).toLocaleDateString()}
                                         </span>
+                                        <div className="text-sm font-bold text-primary mt-1">
+                                            📍 {review.attraction_name || 'Unknown Attraction'}
+                                        </div>
+                                        <div className="text-xs text-muted mt-1">
+                                            {review.age ? `Age: ${review.age}` : ''}
+                                            {review.age && review.nationality ? ' • ' : ''}
+                                            {review.nationality ? `from ${review.nationality}` : ''}
+                                        </div>
                                     </div>
                                     <button
                                         className="btn btn-danger btn-sm"
