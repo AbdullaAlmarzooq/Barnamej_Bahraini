@@ -25,6 +25,7 @@ const Attractions = () => {
     const [photos, setPhotos] = useState<AttractionPhoto[]>([]);
     const [loadingPhotos, setLoadingPhotos] = useState(false);
     const [newPhotoUrl, setNewPhotoUrl] = useState('');
+    const [photoToDelete, setPhotoToDelete] = useState<number | null>(null);
 
     useEffect(() => {
         loadAttractions();
@@ -86,17 +87,18 @@ const Attractions = () => {
         }
     };
 
-    const handleDeletePhoto = async (photoId: number) => {
-        if (!editingAttraction) return;
+    const handleDeletePhoto = (photoId: number) => {
+        setPhotoToDelete(photoId);
+    };
 
-        if (!confirm('Are you sure you want to delete this photo?')) {
-            return;
-        }
+    const confirmDeletePhoto = async () => {
+        if (!editingAttraction || !photoToDelete) return;
 
         try {
-            await deleteAttractionPhoto(photoId);
+            await deleteAttractionPhoto(photoToDelete);
             await loadPhotos(editingAttraction.id);
             await loadAttractions(); // Refresh to update table view
+            setPhotoToDelete(null);
         } catch (err) {
             alert('Failed to delete photo. Make sure it\'s not the last photo.');
             console.error(err);
@@ -108,6 +110,13 @@ const Attractions = () => {
 
         try {
             await setPrimaryPhoto(photoId);
+
+            // Update local state to reflect change immediately in the form
+            const selectedPhoto = photos.find(p => p.id === photoId);
+            if (selectedPhoto) {
+                setEditingAttraction(prev => prev ? ({ ...prev, image: selectedPhoto.url }) : null);
+            }
+
             await loadPhotos(editingAttraction.id);
             await loadAttractions(); // Refresh to update table view
         } catch (err) {
@@ -404,11 +413,12 @@ const Attractions = () => {
                                             {photos.map((photo) => (
                                                 <div key={photo.id} className="photo-item">
                                                     <img
-                                                        src={photo.url || 'https://via.placeholder.com/150?text=No+Image'}
+                                                        src={photo.url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
                                                         alt="Attraction"
                                                         className="photo-thumbnail"
                                                         onError={(e) => {
-                                                            e.currentTarget.src = 'https://via.placeholder.com/150?text=No+Image';
+                                                            e.currentTarget.onerror = null;
+                                                            e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E";
                                                         }}
                                                     />
                                                     {photo.is_primary === 1 && (
@@ -462,6 +472,36 @@ const Attractions = () => {
                         </>
                     )}
                 </form>
+            </Modal>
+
+            {/* Delete Photo Confirmation Modal */}
+            <Modal
+                isOpen={!!photoToDelete}
+                onClose={() => setPhotoToDelete(null)}
+                title="Delete Photo"
+                footer={
+                    <>
+                        <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setPhotoToDelete(null)}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-danger"
+                            onClick={confirmDeletePhoto}
+                        >
+                            Delete
+                        </button>
+                    </>
+                }
+            >
+                <div className="p-4">
+                    <p>Are you sure you want to delete this photo?</p>
+                    <p className="text-sm text-muted mt-2">This action cannot be undone.</p>
+                </div>
             </Modal>
         </div>
     );

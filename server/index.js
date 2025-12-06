@@ -160,17 +160,25 @@ app.post('/reviews', (req, res) => {
     res.json({ success: true });
 });
 
-// Get Itineraries (My vs Public)
+// Get Itineraries (My vs Public vs All)
 app.get('/itineraries', (req, res) => {
-    const isPublic = req.query.public === 'true' ? 1 : 0;
-    const stmt = db.prepare(`
+    let query = `
         SELECT i.*, COUNT(ia.id) as attraction_count 
         FROM itineraries i 
         LEFT JOIN itinerary_attractions ia ON i.id = ia.itinerary_id 
-        WHERE i.is_public = ? 
-        GROUP BY i.id
-    `);
-    const itineraries = stmt.all(isPublic);
+    `;
+
+    const params = [];
+
+    if (req.query.public !== 'all') {
+        query += ' WHERE i.is_public = ?';
+        params.push(req.query.public === 'true' ? 1 : 0);
+    }
+
+    query += ' GROUP BY i.id ORDER BY i.created_at DESC';
+
+    const stmt = db.prepare(query);
+    const itineraries = stmt.all(...params);
     res.json(itineraries.map(convertItinerary));
 });
 
@@ -208,15 +216,42 @@ app.post('/itineraries/:id/attractions', (req, res) => {
 // Update Itinerary Attraction Details
 app.put('/itineraries/attractions/:id', (req, res) => {
     const { start_time, end_time, price, notes } = req.body;
-    db.prepare('UPDATE itinerary_attractions SET start_time = ?, end_time = ?, price = ?, notes = ? WHERE id = ?')
-        .run(start_time, end_time, price, notes, req.params.id);
 
-    // Recalculate total
-    const link = db.prepare('SELECT itinerary_id FROM itinerary_attractions WHERE id = ?').get(req.params.id);
-    if (link) {
-        const items = db.prepare('SELECT price FROM itinerary_attractions WHERE itinerary_id = ?').all(link.itinerary_id);
-        const total = items.reduce((sum, item) => sum + (item.price || 0), 0);
-        db.prepare('UPDATE itineraries SET total_price = ? WHERE id = ?').run(total, link.itinerary_id);
+    // Dynamic update query construction
+    const updates = [];
+    const values = [];
+
+    if (start_time !== undefined) {
+        updates.push('start_time = ?');
+        values.push(start_time);
+    }
+    if (end_time !== undefined) {
+        updates.push('end_time = ?');
+        values.push(end_time);
+    }
+    if (price !== undefined) {
+        updates.push('price = ?');
+        values.push(price);
+    }
+    if (notes !== undefined) {
+        updates.push('notes = ?');
+        values.push(notes);
+    }
+
+    if (updates.length > 0) {
+        values.push(req.params.id);
+        const query = `UPDATE itinerary_attractions SET ${updates.join(', ')} WHERE id = ?`;
+        db.prepare(query).run(...values);
+    }
+
+    // Recalculate total if price changed
+    if (price !== undefined) {
+        const link = db.prepare('SELECT itinerary_id FROM itinerary_attractions WHERE id = ?').get(req.params.id);
+        if (link) {
+            const items = db.prepare('SELECT price FROM itinerary_attractions WHERE itinerary_id = ?').all(link.itinerary_id);
+            const total = items.reduce((sum, item) => sum + (item.price || 0), 0);
+            db.prepare('UPDATE itineraries SET total_price = ? WHERE id = ?').run(total, link.itinerary_id);
+        }
     }
 
     res.json({ success: true });
