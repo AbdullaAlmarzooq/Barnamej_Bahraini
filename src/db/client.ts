@@ -7,17 +7,16 @@ import {
     copyAsync,
     deleteAsync,
     readDirectoryAsync,
-    readAsStringAsync,
-    writeAsStringAsync,
     documentDirectory
 } from 'expo-file-system/legacy';
 
 const DB_NAME = 'barnamej_v2.db';
-const DB_RESET_MARKER = 'db_version_marker.json';
 
-// Set this to true during development if you need to wipe everything on every launch.
-// In production, keep this FALSE.
-const FORCE_RESET = false;
+// In DEVELOPMENT mode (__DEV__ = true): Always reset database on launch
+// This ensures you always get the fresh bundled database after running sync-photos
+// In PRODUCTION mode (__DEV__ = false): Never auto-reset, preserve user data
+declare const __DEV__: boolean;
+const DEV_FORCE_DB_RESET = __DEV__ === true;
 
 export class DatabaseClient {
     private static instance: DatabaseClient;
@@ -84,12 +83,11 @@ export class DatabaseClient {
     }
 
     /**
-     * Checks if a database reset is required based on version marker or force flag.
-     * Deletes old files if needed.
+     * In development mode, always reset the database to get fresh data from bundled assets.
+     * In production, only reset if the database file doesn't exist.
      */
     private async resetDatabaseIfNeeded(): Promise<void> {
         const dbDir = documentDirectory + 'SQLite';
-        const markerPath = `${dbDir}/${DB_RESET_MARKER}`;
 
         // Ensure directory exists first
         const dirInfo = await getInfoAsync(dbDir);
@@ -98,51 +96,46 @@ export class DatabaseClient {
             return; // Directory is new, no reset needed (ensureDatabaseReady will handle copy)
         }
 
-        let shouldReset = FORCE_RESET;
-
-        if (!shouldReset) {
-            // Check version marker
-            const markerInfo = await getInfoAsync(markerPath);
-            if (!markerInfo.exists) {
-                console.log('No version marker found. Performing persistent cleanup...');
-                shouldReset = true;
-            } else {
-                try {
-                    const content = await readAsStringAsync(markerPath);
-                    const data = JSON.parse(content);
-                    if (data.minVersion !== DB_NAME) {
-                        console.log(`Version mismatch (Found: ${data.minVersion}, Required: ${DB_NAME}). Resetting...`);
-                        shouldReset = true;
-                    }
-                } catch (e) {
-                    console.warn('Failed to read version marker. Resetting just in case...');
-                    shouldReset = true;
-                }
-            }
-        }
-
-        if (shouldReset) {
-            await this.performSafeWipe(dbDir);
-
-            // Write new marker
-            await writeAsStringAsync(markerPath, JSON.stringify({ minVersion: DB_NAME }));
-            console.log('Database reset complete. New marker updated.');
+        // In development mode, always delete existing database to get fresh bundled data
+        if (DEV_FORCE_DB_RESET) {
+            console.warn('⚠️ DEV: Forcing SQLite database reset for fresh data');
+            await this.deleteDatabaseFiles(dbDir);
         }
     }
 
     /**
-     * Wipes all database files in the directory to clean stale cache (WAL/SHM etc).
+     * Deletes all SQLite database files including WAL and SHM files.
+     */
+    private async deleteDatabaseFiles(dbDir: string): Promise<void> {
+        const dbPath = `${dbDir}/${DB_NAME}`;
+        const filesToDelete = [
+            dbPath,
+            `${dbPath}-wal`,
+            `${dbPath}-shm`,
+        ];
+
+        for (const file of filesToDelete) {
+            try {
+                const info = await getInfoAsync(file);
+                if (info.exists) {
+                    await deleteAsync(file, { idempotent: true });
+                    console.log(`Deleted: ${file}`);
+                }
+            } catch (e) {
+                console.error(`Error deleting ${file}:`, e);
+            }
+        }
+    }
+
+    /**
+     * Wipes all database files in the directory (for corruption recovery).
      */
     private async performSafeWipe(dbDir: string) {
         console.log('Wiping all SQLite data...');
         try {
             const files = await readDirectoryAsync(dbDir);
             for (const file of files) {
-                // Delete everything except the marker itself (though we overwrite marker anyway)
-                // Primarily target .db, .db-shm, .db-wal
-                if (file !== DB_RESET_MARKER || FORCE_RESET) {
-                    await deleteAsync(`${dbDir}/${file}`, { idempotent: true });
-                }
+                await deleteAsync(`${dbDir}/${file}`, { idempotent: true });
             }
         } catch (e) {
             console.error('Error during wipe:', e);

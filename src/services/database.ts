@@ -87,7 +87,7 @@ export const getItineraries = async () => {
 
   for (let it of itineraries) {
     const stats = await db.getFirstAsync<{ count: number, total: number }>(
-      'SELECT COUNT(*) as count, SUM(price) as total FROM itinerary_items WHERE itinerary_id = ?',
+      'SELECT COUNT(*) as count, SUM(price) as total FROM itinerary_attractions WHERE itinerary_id = ?',
       [it.id]
     );
     it.attraction_count = stats?.count || 0;
@@ -103,7 +103,7 @@ export const getPublicItineraries = async () => {
   // ... (same stats logic as above, ideally refactor)
   for (let it of itineraries) {
     const stats = await db.getFirstAsync<{ count: number, total: number }>(
-      'SELECT COUNT(*) as count, SUM(price) as total FROM itinerary_items WHERE itinerary_id = ?',
+      'SELECT COUNT(*) as count, SUM(price) as total FROM itinerary_attractions WHERE itinerary_id = ?',
       [it.id]
     );
     it.attraction_count = stats?.count || 0;
@@ -129,7 +129,7 @@ export const getItineraryDetails = async (id: number) => {
           a.name, 
           a.image, 
           a.category 
-        FROM itinerary_items i 
+        FROM itinerary_attractions i 
         JOIN attractions a ON i.attraction_id = a.id 
         WHERE i.itinerary_id = ?
     `, [id]);
@@ -137,7 +137,7 @@ export const getItineraryDetails = async (id: number) => {
   itinerary.attractions = items;
 
   const stats = await db.getFirstAsync<{ total: number }>(
-    'SELECT SUM(price) as total FROM itinerary_items WHERE itinerary_id = ?',
+    'SELECT SUM(price) as total FROM itinerary_attractions WHERE itinerary_id = ?',
     [id]
   );
   itinerary.total_price = stats?.total || 0;
@@ -148,7 +148,7 @@ export const getItineraryDetails = async (id: number) => {
 export const addToItinerary = async (itineraryId: number, attractionId: number) => {
   const db = await getDB();
   await db.runAsync(
-    'INSERT INTO itinerary_items (itinerary_id, attraction_id) VALUES (?, ?)',
+    'INSERT INTO itinerary_attractions (itinerary_id, attraction_id) VALUES (?, ?)',
     [itineraryId, attractionId]
   );
   // Note: Granular sync for items not implemented in this demo, usually you sync the whole itinerary
@@ -158,7 +158,7 @@ export const addToItinerary = async (itineraryId: number, attractionId: number) 
 export const updateItineraryAttraction = async (linkId: number, startTime: string, endTime: string, price: number, notes: string) => {
   const db = await getDB();
   await db.runAsync(
-    'UPDATE itinerary_items SET start_time = ?, end_time = ?, price = ?, notes = ? WHERE id = ?',
+    'UPDATE itinerary_attractions SET start_time = ?, end_time = ?, price = ?, notes = ? WHERE id = ?',
     [startTime, endTime, price, notes, linkId]
   );
   return { success: true };
@@ -167,7 +167,7 @@ export const updateItineraryAttraction = async (linkId: number, startTime: strin
 export const removeFromItinerary = async (itineraryId: number, attractionId: number) => {
   const db = await getDB();
   await db.runAsync(
-    'DELETE FROM itinerary_items WHERE itinerary_id = ? AND attraction_id = ?',
+    'DELETE FROM itinerary_attractions WHERE itinerary_id = ? AND attraction_id = ?',
     [itineraryId, attractionId]
   );
   return { success: true };

@@ -30,7 +30,7 @@ const ItinerariesStackNavigator = () => {
     return (
         <ItinerariesStack.Navigator screenOptions={{ headerShown: false }}>
             <ItinerariesStack.Screen name="ItineraryList" component={ItineraryListScreen} options={{ title: 'My Itineraries' }} />
-            <ItinerariesStack.Screen name="ItineraryDetails" component={ItineraryDetailsScreen} options={{ title: 'Itinerary Details', headerShown: true }} />
+            <ItinerariesStack.Screen name="ItineraryDetails" component={ItineraryDetailsScreen} options={{ headerShown: false }} />
         </ItinerariesStack.Navigator>
     );
 };

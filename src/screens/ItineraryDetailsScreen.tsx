@@ -118,70 +118,90 @@ const ItineraryDetailsScreen = () => {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
+            {/* Fixed Header */}
             <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                         <Ionicons name="arrow-back" size={24} color="#333" />
                     </TouchableOpacity>
+                    <Text style={styles.headerTitle} numberOfLines={1}>{itinerary.name}</Text>
                     <TouchableOpacity onPress={handleDeleteItinerary}>
-                        <Ionicons name="trash-outline" size={24} color="#D71A28" />
+                        <Ionicons name="trash-outline" size={22} color="#D71A28" />
                     </TouchableOpacity>
                 </View>
-                <Text style={styles.title}>{itinerary.name}</Text>
-                {itinerary.description ? <Text style={styles.description}>{itinerary.description}</Text> : null}
-                <View style={styles.statsRow}>
-                    <Text style={styles.subtitle}>{itinerary.attractions.length} stops</Text>
-                    <Text style={styles.totalPrice}>Total: {itinerary.total_price ? itinerary.total_price.toFixed(2) : '0.00'} BHD</Text>
+
+                {/* Summary Row */}
+                <View style={styles.summaryRow}>
+                    <View style={styles.summaryItem}>
+                        <Ionicons name="person-outline" size={16} color="#666" />
+                        <Text style={styles.summaryText}>{itinerary.creator_name || 'Me'}</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                        <Ionicons name="location-outline" size={16} color="#666" />
+                        <Text style={styles.summaryText}>{itinerary.attractions?.length || 0} stops</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                        <Ionicons name="cash-outline" size={16} color="#D71A28" />
+                        <Text style={[styles.summaryText, styles.priceText]}>
+                            {itinerary.total_price ? itinerary.total_price.toFixed(2) : '0.00'} BHD
+                        </Text>
+                    </View>
                 </View>
             </View>
 
-            <FlatList
-                data={itinerary.attractions}
-                keyExtractor={(item) => item.link_id.toString()}
-                renderItem={({ item }) => (
-                    <View style={styles.card}>
-                        <TouchableOpacity
-                            style={styles.cardMain}
-                            onPress={() => navigation.navigate('Attractions', { screen: 'AttractionDetails', params: { attractionId: item.id } })}
-                            activeOpacity={0.9}
-                        >
-                            <Image source={getFirstPhoto(item.id)} style={styles.image} />
-                            <View style={styles.cardContent}>
-                                <Text style={styles.attractionName}>{item.name}</Text>
-                                <Text style={styles.category}>{item.category}</Text>
-                                <View style={styles.detailsRow}>
-                                    <Text style={styles.detailText}>
-                                        <Ionicons name="time-outline" size={14} /> {item.start_time || '--:--'} - {item.end_time || '--:--'}
-                                    </Text>
-                                    <Text style={styles.detailText}>
-                                        <Ionicons name="pricetag-outline" size={14} /> {item.price ? `${item.price} BHD` : 'Free'}
-                                    </Text>
-                                </View>
-                                {item.notes ? <Text style={styles.notes} numberOfLines={1}>{item.notes}</Text> : null}
-                            </View>
-                        </TouchableOpacity>
-                        <View style={styles.actions}>
-                            <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-                                <Ionicons name="create-outline" size={20} color="#666" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.actionButton} onPress={() => handleRemoveAttraction(item.id)}>
-                                <Ionicons name="trash-outline" size={20} color="#D71A28" />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
+            {/* Scrollable Content */}
+            <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollInner}>
+                {itinerary.description ? (
+                    <Text style={styles.description}>{itinerary.description}</Text>
+                ) : null}
+
+                {itinerary.attractions?.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Text style={styles.emptyText}>No attractions in this itinerary yet.</Text>
+                        <Ionicons name="map-outline" size={48} color="#ccc" />
+                        <Text style={styles.emptyText}>No attractions added yet</Text>
                         <Button
                             title="Browse Attractions"
                             onPress={() => navigation.navigate('Attractions', { screen: 'AttractionsList' })}
                             style={styles.browseButton}
                         />
                     </View>
-                }
-            />
+                ) : (
+                    itinerary.attractions?.map((item: any, index: number) => (
+                        <View key={item.link_id} style={styles.card}>
+                            <View style={styles.cardNumber}>
+                                <Text style={styles.cardNumberText}>{index + 1}</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.cardMain}
+                                onPress={() => navigation.navigate('Attractions', { screen: 'AttractionDetails', params: { attractionId: item.id } })}
+                                activeOpacity={0.8}
+                            >
+                                <Image source={getFirstPhoto(item.id)} style={styles.image} />
+                                <View style={styles.cardContent}>
+                                    <Text style={styles.attractionName} numberOfLines={1}>{item.name}</Text>
+                                    <View style={styles.cardMeta}>
+                                        <Text style={styles.category}>{item.category}</Text>
+                                        <Text style={styles.timeText}>
+                                            {item.start_time || '--:--'} - {item.end_time || '--:--'}
+                                        </Text>
+                                    </View>
+                                    {item.price ? (
+                                        <Text style={styles.priceTag}>{item.price} BHD</Text>
+                                    ) : null}
+                                </View>
+                            </TouchableOpacity>
+                            <View style={styles.actions}>
+                                <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
+                                    <Ionicons name="create-outline" size={18} color="#666" />
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.actionButton} onPress={() => handleRemoveAttraction(item.id)}>
+                                    <Ionicons name="close-circle-outline" size={18} color="#D71A28" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ))
+                )}
+            </ScrollView>
 
             {/* Edit Modal */}
             <Modal
@@ -266,60 +286,87 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     header: {
-        padding: 20,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        paddingBottom: 12,
+        backgroundColor: '#f8f9fa',
     },
     headerTop: {
         flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: 16,
     },
     backButton: {
         padding: 4,
     },
-    title: {
-        fontSize: 28,
+    headerTitle: {
+        flex: 1,
+        fontSize: 18,
         fontWeight: 'bold',
         color: '#1a1a1a',
-        marginBottom: 4,
+        marginHorizontal: 12,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+    },
+    summaryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    summaryText: {
+        fontSize: 13,
+        color: '#666',
+    },
+    priceText: {
+        color: '#D71A28',
+        fontWeight: '600',
+    },
+    scrollContent: {
+        flex: 1,
+    },
+    scrollInner: {
+        padding: 16,
+        paddingBottom: 40,
+        backgroundColor: '#f8f9fa',
     },
     description: {
         fontSize: 14,
         color: '#666',
-        marginBottom: 8,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#666',
-    },
-    totalPrice: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#D71A28',
-    },
-    listContent: {
-        padding: 20,
+        marginBottom: 16,
+        lineHeight: 20,
     },
     card: {
         backgroundColor: '#fff',
-        borderRadius: 12,
-        marginBottom: 16,
-        padding: 12,
+        borderRadius: 10,
+        marginBottom: 10,
+        padding: 10,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowRadius: 2,
+        elevation: 1,
         flexDirection: 'row',
         alignItems: 'center',
+    },
+    cardNumber: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#D71A28',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    cardNumberText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: 'bold',
     },
     cardMain: {
         flex: 1,
@@ -327,62 +374,59 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     image: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        marginRight: 12,
+        width: 50,
+        height: 50,
+        borderRadius: 6,
+        marginRight: 10,
     },
     cardContent: {
         flex: 1,
     },
     attractionName: {
-        fontSize: 16,
+        fontSize: 14,
         fontWeight: '600',
         color: '#333',
-        marginBottom: 2,
     },
-    category: {
-        fontSize: 12,
-        color: '#999',
-        marginBottom: 4,
-    },
-    detailsRow: {
+    cardMeta: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 2,
+        marginTop: 2,
+        gap: 8,
     },
-    detailText: {
-        fontSize: 12,
-        color: '#555',
-        marginRight: 12,
+    category: {
+        fontSize: 11,
+        color: '#999',
     },
-    notes: {
+    timeText: {
+        fontSize: 11,
+        color: '#666',
+    },
+    priceTag: {
         fontSize: 12,
-        color: '#777',
-        fontStyle: 'italic',
+        color: '#D71A28',
+        fontWeight: '500',
+        marginTop: 2,
     },
     actions: {
-        flexDirection: 'column',
-        justifyContent: 'space-around',
-        paddingLeft: 8,
-        borderLeftWidth: 1,
-        borderLeftColor: '#eee',
-        height: '100%',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
     actionButton: {
-        padding: 8,
+        padding: 6,
     },
     emptyContainer: {
         alignItems: 'center',
         marginTop: 60,
     },
     emptyText: {
-        fontSize: 16,
-        color: '#666',
+        fontSize: 14,
+        color: '#999',
+        marginTop: 12,
         marginBottom: 20,
     },
     browseButton: {
-        minWidth: 200,
+        minWidth: 180,
     },
     modalOverlay: {
         flex: 1,

@@ -361,12 +361,12 @@ const Attractions = () => {
                             type="text"
                             name="image"
                             className="input"
-                            placeholder="http://192.168.100.38:3000/public/images/attractions/1/photo.jpg"
+                            placeholder="http://localhost:3000/assets/AttractionsPhotos/1/photo.jpg"
                             defaultValue={editingAttraction?.image}
                             required
                         />
                         <small className="text-muted">
-                            Photos stored in server/public/images/attractions/{'{id}'}/ folder
+                            Photos stored in assets/AttractionsPhotos/{'{id}'}/ folder
                         </small>
                     </div>
 
@@ -452,7 +452,7 @@ const Attractions = () => {
                                                 <input
                                                     type="text"
                                                     className="input"
-                                                    placeholder="http://192.168.100.38:3000/public/images/attractions/{id}/photo.jpg"
+                                                    placeholder="http://localhost:3000/assets/AttractionsPhotos/{id}/photo.jpg"
                                                     value={newPhotoUrl}
                                                     onChange={(e) => setNewPhotoUrl(e.target.value)}
                                                 />

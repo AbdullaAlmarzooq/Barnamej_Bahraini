@@ -215,10 +215,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
     },
     header: {
-        padding: 20,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+        paddingHorizontal: 20,
+        paddingTop: 10,
+        paddingBottom: 16,
+        backgroundColor: '#f8f9fa',
     },
     title: {
         fontSize: 24,
@@ -250,6 +250,8 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 20,
         paddingBottom: 80,
+        backgroundColor: '#f8f9fa',
+        flexGrow: 1,
     },
     card: {
         backgroundColor: '#fff',
