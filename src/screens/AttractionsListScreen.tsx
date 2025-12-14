@@ -52,42 +52,6 @@ const AttractionsListScreen = () => {
         setFilteredAttractions(result);
     };
 
-    const renderHeader = () => (
-        <View style={styles.header}>
-            <Text style={styles.title}>Explore Bahrain</Text>
-
-            <View style={styles.searchContainer}>
-                <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Search attractions..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
-            </View>
-
-            <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
-                {categories.map((category) => (
-                    <TouchableOpacity
-                        key={category}
-                        style={[
-                            styles.categoryChip,
-                            selectedCategory === category && styles.categoryChipActive
-                        ]}
-                        onPress={() => setSelectedCategory(category)}
-                    >
-                        <Text style={[
-                            styles.categoryText,
-                            selectedCategory === category && styles.categoryTextActive
-                        ]}>
-                            {category}
-                        </Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-        </View>
-    );
-
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <FlatList
@@ -100,7 +64,15 @@ const AttractionsListScreen = () => {
                     />
                 )}
                 contentContainerStyle={styles.listContent}
-                ListHeaderComponent={renderHeader}
+                ListHeaderComponent={
+                    <AttractionsHeader
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedCategory={selectedCategory}
+                        setSelectedCategory={setSelectedCategory}
+                        categories={categories}
+                    />
+                }
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>No attractions found.</Text>
@@ -110,6 +82,50 @@ const AttractionsListScreen = () => {
         </SafeAreaView>
     );
 };
+
+interface AttractionsHeaderProps {
+    searchQuery: string;
+    setSearchQuery: (text: string) => void;
+    selectedCategory: string;
+    setSelectedCategory: (category: string) => void;
+    categories: string[];
+}
+
+const AttractionsHeader = ({ searchQuery, setSearchQuery, selectedCategory, setSelectedCategory, categories }: AttractionsHeaderProps) => (
+    <View style={styles.header}>
+        <Text style={styles.title}>Explore Bahrain</Text>
+
+        <View style={styles.searchContainer}>
+            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Search attractions..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+            />
+        </View>
+
+        <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={styles.categoriesContainer}>
+            {categories.map((category) => (
+                <TouchableOpacity
+                    key={category}
+                    style={[
+                        styles.categoryChip,
+                        selectedCategory === category && styles.categoryChipActive
+                    ]}
+                    onPress={() => setSelectedCategory(category)}
+                >
+                    <Text style={[
+                        styles.categoryText,
+                        selectedCategory === category && styles.categoryTextActive
+                    ]}>
+                        {category}
+                    </Text>
+                </TouchableOpacity>
+            ))}
+        </ScrollView>
+    </View>
+);
 
 const styles = StyleSheet.create({
     container: {

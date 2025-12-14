@@ -147,9 +147,14 @@ export const getItineraryDetails = async (id: number) => {
 
 export const addToItinerary = async (itineraryId: number, attractionId: number) => {
   const db = await getDB();
+
+  // Fetch default price from attraction
+  const attraction = await db.getFirstAsync<{ price: number }>('SELECT price FROM attractions WHERE id = ?', [attractionId]);
+  const price = attraction?.price || 0;
+
   await db.runAsync(
-    'INSERT INTO itinerary_attractions (itinerary_id, attraction_id) VALUES (?, ?)',
-    [itineraryId, attractionId]
+    'INSERT INTO itinerary_attractions (itinerary_id, attraction_id, price) VALUES (?, ?, ?)',
+    [itineraryId, attractionId, price]
   );
   // Note: Granular sync for items not implemented in this demo, usually you sync the whole itinerary
   return { success: true };

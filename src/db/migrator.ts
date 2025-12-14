@@ -10,6 +10,7 @@ export interface Migration {
 const MIGRATIONS: Record<string, Migration> = {
     '0001_init': require('./migrations/0001_init'),
     '0002_add_search_index': require('./migrations/0002_add_search_index'),
+    '0003_fix_itinerary_table': require('./migrations/0003_fix_itinerary_table'),
 };
 
 // Simple hash function for checksums (in real app, use crypto)
