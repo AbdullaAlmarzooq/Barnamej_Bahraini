@@ -1,7 +1,7 @@
 // AUTO-GENERATED FILE - DO NOT EDIT MANUALLY
 // Run 'npm run sync-photos' in server folder to regenerate
 // Photos are ordered: primary first, then by display_order
-// Generated: 2025-12-13T07:05:34.653Z
+// Generated: 2025-12-15T11:15:35.842Z
 
 export const attractionPhotos: { [key: number]: any[] } = {
     1: [
@@ -31,8 +31,12 @@ export const attractionPhotos: { [key: number]: any[] } = {
     7: [
         require('../../assets/AttractionsPhotos/7/1.png'),
         require('../../assets/AttractionsPhotos/7/2.png'),
-        require('../../assets/AttractionsPhotos/7/2.png'),
         require('../../assets/AttractionsPhotos/7/3.png'),
+    ],
+    8: [
+        require('../../assets/AttractionsPhotos/8/0.jpg'),
+        require('../../assets/AttractionsPhotos/8/1.png'),
+        require('../../assets/AttractionsPhotos/8/2.jpg'),
     ],
 };
 

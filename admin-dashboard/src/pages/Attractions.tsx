@@ -281,6 +281,7 @@ const Attractions = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={editingAttraction ? 'Edit Attraction' : 'Add New Attraction'}
+                closeOnOverlayClick={false}
                 footer={
                     <>
                         <button

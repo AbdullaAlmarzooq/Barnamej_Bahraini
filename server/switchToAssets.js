@@ -1,5 +1,7 @@
 const Database = require('better-sqlite3');
-const db = new Database('barnamej.db');
+const path = require('path');
+const dbPath = path.join(__dirname, '../assets/database/Barnamej.db');
+const db = new Database(dbPath);
 
 console.log('🔄 Switching photo storage to local assets...');
 

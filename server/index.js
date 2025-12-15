@@ -15,7 +15,8 @@ app.use('/public', express.static('public'));
 const path = require('path');
 app.use('/assets', express.static(path.join(__dirname, '../assets')));
 
-const db = new Database('barnamej.db');
+const dbPath = path.join(__dirname, '../assets/database/Barnamej.db');
+const db = new Database(dbPath);
 
 // Initialize Database
 const initDatabase = () => {

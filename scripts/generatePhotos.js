@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const Database = require('../server/node_modules/better-sqlite3');
 
-const DB_PATH = path.join(__dirname, '../server/barnamej.db');
+const DB_PATH = path.join(__dirname, '../assets/database/Barnamej.db');
 const PHOTOS_DIR = path.join(__dirname, '../assets/AttractionsPhotos');
 const OUTPUT_FILE = path.join(__dirname, '../src/utils/attractionPhotos.ts');
 
