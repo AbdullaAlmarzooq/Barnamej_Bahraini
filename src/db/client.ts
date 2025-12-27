@@ -16,7 +16,7 @@ const DB_NAME = 'barnamej_v2.db';
 // This ensures you always get the fresh bundled database after running sync-photos
 // In PRODUCTION mode (__DEV__ = false): Never auto-reset, preserve user data
 declare const __DEV__: boolean;
-const DEV_FORCE_DB_RESET = __DEV__ === true;
+const DEV_FORCE_DB_RESET = false; // Changed to false to persist data across reloads
 
 export class DatabaseClient {
     private static instance: DatabaseClient;

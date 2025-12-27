@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Image, Modal, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Image, Modal, TextInput, ScrollView, Switch } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getItineraryDetails, removeFromItinerary, deleteItinerary, updateItineraryAttraction } from '../services/database';
+import { getItineraryDetails, removeFromItinerary, deleteItinerary, updateItineraryAttraction, toggleItineraryAutoSort, reorderItineraryAttractions } from '../services/database';
 import { getFirstPhoto } from '../utils/attractionPhotos';
 import Button from '../components/Button';
 
@@ -108,6 +108,45 @@ const ItineraryDetailsScreen = () => {
         }
     };
 
+    const handleToggleAutoSort = async (value: boolean) => {
+        try {
+            // Optimistic update
+            setItinerary((prev: any) => ({ ...prev, is_auto_sort_enabled: value ? 1 : 0 }));
+            await toggleItineraryAutoSort(itineraryId, value);
+            loadData(); // Reload to get sorted list if enabled
+        } catch (error) {
+            Alert.alert('Error', 'Failed to toggle auto-sort.');
+            loadData(); // Revert on error
+        }
+    };
+
+    const handleMoveAttraction = async (index: number, direction: 'up' | 'down') => {
+        if (!itinerary.attractions) return;
+
+        const newAttractions = [...itinerary.attractions];
+        const swapIndex = direction === 'up' ? index - 1 : index + 1;
+
+        if (swapIndex < 0 || swapIndex >= newAttractions.length) return;
+
+        // Swap items
+        [newAttractions[index], newAttractions[swapIndex]] = [newAttractions[swapIndex], newAttractions[index]];
+
+        // Optimistic update for smooth UI
+        setItinerary((prev: any) => ({ ...prev, attractions: newAttractions }));
+
+        try {
+            // Create ordered list of link_ids (which serves as the "identity" for the attraction in the itinerary)
+            const orderedLinkIds = newAttractions.map((item: any) => item.link_id);
+            await reorderItineraryAttractions(itineraryId, orderedLinkIds);
+            // No need to reload data immediately as we optimistically updated, 
+            // but reloading ensures full consistency
+            loadData();
+        } catch (error) {
+            Alert.alert('Error', 'Failed to reorder attractions.');
+            loadData(); // Revert on error
+        }
+    };
+
     if (!itinerary) {
         return (
             <View style={styles.loadingContainer}>
@@ -146,6 +185,19 @@ const ItineraryDetailsScreen = () => {
                             {itinerary.total_price ? itinerary.total_price.toFixed(2) : '0.00'} BHD
                         </Text>
                     </View>
+                </View>
+
+                {/* Auto-Sort Toggle */}
+                <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Auto-sort attractions by time</Text>
+                    <Switch
+                        trackColor={{ false: "#767577", true: "#D71A28" }}
+                        thumbColor={itinerary.is_auto_sort_enabled ? "#fff" : "#f4f3f4"}
+                        ios_backgroundColor="#3e3e3e"
+                        onValueChange={handleToggleAutoSort}
+                        value={itinerary.is_auto_sort_enabled === 1}
+                        disabled={itinerary.is_public === 1}
+                    />
                 </View>
             </View>
 
@@ -191,6 +243,25 @@ const ItineraryDetailsScreen = () => {
                                 </View>
                             </TouchableOpacity>
                             <View style={styles.actions}>
+                                {/* Manual Reorder Buttons */}
+                                {(!itinerary.is_auto_sort_enabled && !itinerary.is_public) && (
+                                    <View style={styles.reorderButtons}>
+                                        <TouchableOpacity
+                                            style={[styles.actionButton, index === 0 && styles.disabledButton]}
+                                            onPress={() => handleMoveAttraction(index, 'up')}
+                                            disabled={index === 0}
+                                        >
+                                            <Ionicons name="chevron-up" size={20} color={index === 0 ? "#ccc" : "#666"} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.actionButton, index === (itinerary.attractions.length - 1) && styles.disabledButton]}
+                                            onPress={() => handleMoveAttraction(index, 'down')}
+                                            disabled={index === (itinerary.attractions.length - 1)}
+                                        >
+                                            <Ionicons name="chevron-down" size={20} color={index === (itinerary.attractions.length - 1) ? "#ccc" : "#666"} />
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
                                 <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
                                     <Ionicons name="create-outline" size={18} color="#666" />
                                 </TouchableOpacity>
@@ -271,7 +342,7 @@ const ItineraryDetailsScreen = () => {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 };
 
@@ -326,6 +397,20 @@ const styles = StyleSheet.create({
     priceText: {
         color: '#D71A28',
         fontWeight: '600',
+    },
+    toggleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 12,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+    },
+    toggleLabel: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '500',
     },
     scrollContent: {
         flex: 1,
@@ -414,6 +499,13 @@ const styles = StyleSheet.create({
     },
     actionButton: {
         padding: 6,
+    },
+    reorderButtons: {
+        flexDirection: 'column',
+        marginRight: 4,
+    },
+    disabledButton: {
+        opacity: 0.3,
     },
     emptyContainer: {
         alignItems: 'center',

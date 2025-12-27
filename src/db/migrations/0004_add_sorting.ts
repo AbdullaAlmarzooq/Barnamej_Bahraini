@@ -12,10 +12,37 @@ export const up = async (db: SQLiteDatabase) => {
     } catch (e) { /* ignore */ }
 
     // 3. Populate existing rows with initial sort_order based on insertion (id order)
-    // We need to do this per itinerary to ensure 0-based indexing for each group
+    // We only want to do this ONCE (when upgrading to version 4).
+    // Future runs should skip this to preserve user's manual reordering.
+
+    // Check if this population step has already run via schema_meta
+    // Note: The caller (migrator.ts) already updates schema_meta AFTER this returns.
+    // However, if we want to be extra safe inside here or if run independently:
+
+    // Actually, migrator.ts is configured to SKIP this entire file if version >= 4.
+    // But per instructions: "Modify migration 0004... so that: It ONLY: adds columns... It DOES NOT: recalculate..."
+    // IF the caller logic didn't exist or failed, we should guard here too?
+    // Let's rely on the strategy: 
+    // If columns exist, ADD COLUMN throws/ignores.
+    // The population logic MUST check if it's needed.
+    // Since we can't easily check "did I populate before?" without a flag,
+    // and we just added the flag (is_auto_sort_enabled), maybe we check if all are default?
+    // BETTER: Query schema_meta here too as a safety guard.
+
+    try {
+        const meta = await db.getFirstAsync<{ version: number }>('SELECT version FROM schema_meta');
+        if (meta && meta.version >= 4) {
+            console.log('Skipping sort_order population (version >= 4)');
+            return;
+        }
+    } catch (e) { /* ignore if table missing, proceed? */ }
+
     const itineraries = await db.getAllAsync<{ id: number }>('SELECT id FROM itineraries');
 
     for (const it of itineraries) {
+        // Only update if sort_order is all 0 (default)?
+        // Or blindly update if version < 4 (which means "first run").
+
         const items = await db.getAllAsync<{ id: number }>('SELECT id FROM itinerary_attractions WHERE itinerary_id = ? ORDER BY id ASC', [it.id]);
 
         for (let i = 0; i < items.length; i++) {

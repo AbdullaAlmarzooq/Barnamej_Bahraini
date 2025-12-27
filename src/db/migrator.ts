@@ -1,6 +1,8 @@
 import { SQLiteDatabase } from 'expo-sqlite';
 import { runTransaction } from './utils/execute';
 
+const LATEST_SCHEMA_VERSION = 4;
+
 export interface Migration {
     up: (db: SQLiteDatabase) => Promise<void>;
     down: (db: SQLiteDatabase) => Promise<void>;
@@ -27,7 +29,7 @@ const computeChecksum = (content: string): string => {
 
 export const runMigrations = async (db: SQLiteDatabase) => {
     try {
-        // 1. Ensure migrations table exists
+        // 1. Ensure migrations and schema_meta tables exist
         await db.execAsync(`
       CREATE TABLE IF NOT EXISTS migrations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,7 +37,21 @@ export const runMigrations = async (db: SQLiteDatabase) => {
         checksum TEXT,
         executed_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS schema_meta (
+        version INTEGER
+      );
     `);
+
+        // Get current schema version
+        const versionResult = await db.getFirstAsync<{ version: number }>('SELECT version FROM schema_meta');
+        let currentVersion = versionResult?.version || 0;
+
+        // Initialize version if it doesn't exist (assuming 0 for fresh starts or existing non-versioned Dbs)
+        if (!versionResult) {
+            await db.runAsync('INSERT INTO schema_meta (version) VALUES (?)', [0]);
+        }
+
 
         // 2. Get executed migrations
         const executed = await db.getAllAsync<{ name: string, checksum: string }>('SELECT name, checksum FROM migrations');
@@ -45,6 +61,13 @@ export const runMigrations = async (db: SQLiteDatabase) => {
         const sortedKeys = Object.keys(MIGRATIONS).sort();
 
         for (const key of sortedKeys) {
+            // SPECIAL HANDLING FOR 0004: Schema Version Check
+            if (key === '0004_add_sorting') {
+                if (currentVersion >= 4) {
+                    console.log(`Skipping migration ${key} (Schema Version ${currentVersion} >= 4)`);
+                    continue;
+                }
+            }
             // Calculate checksum of the migration logic (just using strict name mapping for now as proxy for content identity in this environment without reading file content easily)
             // In a strict environment, we'd read the file content. 
             // For this implementation, we will use a computed hash of the key + simple string to simulate checks, 
@@ -68,6 +91,12 @@ export const runMigrations = async (db: SQLiteDatabase) => {
             await runTransaction(db, async () => {
                 await migrationModule.up(db);
                 await db.runAsync('INSERT INTO migrations (name, checksum) VALUES (?, ?)', [key, checksum]);
+
+                // Update schema version if this was the sorting migration
+                if (key === '0004_add_sorting') {
+                    await db.runAsync('UPDATE schema_meta SET version = ?', [4]);
+                    currentVersion = 4;
+                }
             });
 
             console.log(`Migration ${key} completed`);
