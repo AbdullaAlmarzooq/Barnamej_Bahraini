@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const Database = require('../server/node_modules/better-sqlite3');
+const Database = require('../legacy-server/node_modules/better-sqlite3/lib');
 
 const DB_PATH = path.join(__dirname, '../assets/database/Barnamej.db');
 const PHOTOS_DIR = path.join(__dirname, '../assets/AttractionsPhotos');

@@ -610,7 +610,7 @@ const API_BASE_URL = __DEV__
 #### 5. Start the Backend Server
 
 ```bash
-cd server
+cd legacy-server
 npm run dev    # Development with auto-reload
 # or
 npm start      # Production mode
@@ -635,7 +635,7 @@ Then:
 #### 7. Start Admin Dashboard (Optional)
 
 ```bash
-cd admin-dashboard
+cd apps/admin-dashboard
 npm run dev
 ```
 
