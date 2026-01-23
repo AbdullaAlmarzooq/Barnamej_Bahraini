@@ -52,27 +52,17 @@
 
 ```
 Barnamej_Bahraini/
-├── App.tsx                 # Mobile app entry point
-├── src/                    # Mobile app source code
-│   ├── screens/            # 7 screen components
-│   ├── components/         # Reusable UI components
-│   ├── services/           # API & database services
-│   ├── db/                 # Database layer (client, migrations, queue)
-│   ├── navigation/         # Navigation configuration
-│   ├── api/                # API endpoint definitions
-│   └── utils/              # Utility functions
-├── server/                 # Express.js backend
-│   ├── index.js            # Main server file (~530 lines)
-│   └── public/             # Static assets
-├── admin-dashboard/        # React admin web app
-│   └── src/
-│       ├── pages/          # Dashboard, Attractions, Reviews, Itineraries
-│       ├── components/     # Layout and Common components
-│       ├── api/            # API client
-│       └── types/          # TypeScript types
-├── assets/                 # App assets & preloaded database
-├── scripts/                # Utility scripts for photo sync
-└── package.json            # Root dependencies
+├── apps/
+│   ├── mobile/             # Mobile app source (Expo)
+│   │   ├── src/            # Screens, components, services
+│   │   └── App.tsx         # Mobile entry point
+│   └── admin-dashboard/    # Admin Web App (Vite/React)
+├── legacy-server/          # Express.js Backend Server
+├── packages/               # Shared packages (future use)
+├── docs/                   # Documentation
+├── assets/                 # Shared assets
+├── App.ts                  # Root Expo entry
+└── package.json            # Root dependencies & scripts
 ```
 
 ### Data Flow Architecture
@@ -111,7 +101,7 @@ Barnamej_Bahraini/
 
 ### Server Architecture
 
-The backend is a single-file Express.js server (`server/index.js`) running on port 3000.
+The backend is a single-file Express.js server (`legacy-server/index.js`) running on port 3000.
 
 #### Key Components
 
@@ -193,11 +183,11 @@ The mobile app follows a modular architecture with clear separation of concerns:
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| Screens | `src/screens/` | Page-level components |
-| Components | `src/components/` | Reusable UI elements |
-| Services | `src/services/` | Business logic & data access |
-| DB Layer | `src/db/` | SQLite client, migrations, sync |
-| Navigation | `src/navigation/` | Routing configuration |
+| Screens | `apps/mobile/src/screens/` | Page-level components |
+| Components | `apps/mobile/src/components/` | Reusable UI elements |
+| Services | `apps/mobile/src/services/` | Business logic & data access |
+| DB Layer | `apps/mobile/src/db/` | SQLite client, migrations, sync |
+| Navigation | `apps/mobile/src/navigation/` | Routing configuration |
 
 ### Navigation Structure
 
@@ -311,7 +301,7 @@ A styled button with three variants:
 - `secondary`: White with red text
 - `outline`: Transparent with red border
 
-### Database Layer (`src/db/`)
+### Database Layer (`apps/mobile/src/db/`)
 
 #### `client.ts` - Database Client
 **Purpose**: Singleton SQLite connection manager with preloaded database support
@@ -582,20 +572,20 @@ npm install
 #### 2. Install Server Dependencies
 
 ```bash
-cd server
+cd legacy-server
 npm install
 ```
 
 #### 3. Install Admin Dashboard Dependencies
 
 ```bash
-cd ../admin-dashboard
+cd apps/admin-dashboard
 npm install
 ```
 
 #### 4. Configure API URL (Important!)
 
-Edit `src/services/api.ts` and update the IP address:
+Edit `apps/mobile/src/services/api.ts` and update the IP address:
 
 ```typescript
 const API_BASE_URL = __DEV__
@@ -645,9 +635,9 @@ Dashboard runs at `http://localhost:5173`
 
 **Recommended Terminal Setup**:
 ```
-Terminal 1 (Server):     cd server && npm run dev
+Terminal 1 (Server):     cd legacy-server && npm run dev
 Terminal 2 (Mobile):     npm start
-Terminal 3 (Dashboard):  cd admin-dashboard && npm run dev
+Terminal 3 (Dashboard):  cd apps/admin-dashboard && npm run dev
 ```
 
 ---
@@ -658,8 +648,8 @@ Terminal 3 (Dashboard):  cd admin-dashboard && npm run dev
 
 | Location | Setting | Description |
 |----------|---------|-------------|
-| `src/services/api.ts` | `API_BASE_URL` | Backend server URL |
-| `server/index.js` | `PORT` | Server port (default: 3000) |
+| `apps/mobile/src/services/api.ts` | `API_BASE_URL` | Backend server URL |
+| `legacy-server/index.js` | `PORT` | Server port (default: 3000) |
 | `app.json` | Various | Expo app configuration |
 
 ### app.json Settings
@@ -689,7 +679,7 @@ Terminal 3 (Dashboard):  cd admin-dashboard && npm run dev
 
 ### Development Flags
 
-In `src/db/client.ts`:
+In `apps/mobile/src/db/client.ts`:
 ```typescript
 const DEV_FORCE_DB_RESET = false; // Set true to reset DB on each launch
 ```
@@ -720,7 +710,7 @@ const DEV_FORCE_DB_RESET = false; // Set true to reset DB on each launch
 
 ### Areas for Improvement
 
-1. **Backend Single File**: `server/index.js` is 530+ lines; consider splitting into routes/controllers
+1. **Backend Single File**: `legacy-server/index.js` is 530+ lines; consider splitting into routes/controllers
 2. **No Authentication**: Admin endpoints lack access control
 3. **Limited Type Safety**: Server uses plain JavaScript
 4. **Missing Tests**: No unit or integration tests
