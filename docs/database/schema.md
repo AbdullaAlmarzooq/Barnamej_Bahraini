@@ -19,8 +19,6 @@ The schema follows production best practices including:
 -- Production-Ready Database Design
 -- ============================================================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
 -- ENUMS
@@ -51,7 +49,7 @@ CREATE TYPE review_status AS ENUM (
 
 -- Nationalities reference table
 CREATE TABLE nationalities (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(100) NOT NULL UNIQUE,
   code varchar(3) UNIQUE, -- ISO 3166-1 alpha-3 code
   is_active boolean DEFAULT true,
@@ -67,7 +65,7 @@ CREATE INDEX idx_nationalities_active ON nationalities(is_active) WHERE is_activ
 
 -- Attractions table
 CREATE TABLE attractions (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name varchar(255) NOT NULL,
   slug varchar(255), -- For SEO-friendly URLs (uniqueness enforced by partial index)
   description text,
@@ -117,7 +115,7 @@ CREATE INDEX idx_attractions_search ON attractions
 -- ============================================================================
 
 CREATE TABLE attraction_photos (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   attraction_id uuid NOT NULL REFERENCES attractions(id) ON DELETE CASCADE,
   
   -- Supabase Storage integration
@@ -157,7 +155,7 @@ CREATE UNIQUE INDEX unique_primary_photo_per_attraction
 -- ============================================================================
 
 CREATE TABLE reviews (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   attraction_id uuid NOT NULL REFERENCES attractions(id) ON DELETE CASCADE,
   user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   
@@ -192,11 +190,7 @@ CREATE TABLE reviews (
   -- Audit fields
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
-  deleted_at timestamptz,
-  
-  -- Prevent duplicate reviews from same user
-  CONSTRAINT unique_user_attraction_review UNIQUE (user_id, attraction_id) 
-    WHERE deleted_at IS NULL AND user_id IS NOT NULL
+  deleted_at timestamptz
 );
 
 CREATE INDEX idx_reviews_attraction ON reviews(attraction_id) WHERE deleted_at IS NULL;
@@ -214,7 +208,7 @@ CREATE INDEX idx_reviews_approved_for_rating ON reviews(attraction_id, overall_r
 -- ============================================================================
 
 CREATE TABLE itineraries (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   
   -- Itinerary details
@@ -262,7 +256,7 @@ CREATE INDEX idx_itineraries_dates ON itineraries(start_date, end_date) WHERE de
 -- ============================================================================
 
 CREATE TABLE itinerary_attractions (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   itinerary_id uuid NOT NULL REFERENCES itineraries(id) ON DELETE CASCADE,
   attraction_id uuid NOT NULL REFERENCES attractions(id) ON DELETE CASCADE,
   
@@ -306,7 +300,7 @@ CREATE UNIQUE INDEX unique_itinerary_position
 -- ============================================================================
 
 CREATE TABLE sync_log (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   device_id varchar(255),
   
