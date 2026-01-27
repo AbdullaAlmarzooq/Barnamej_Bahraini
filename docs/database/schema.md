@@ -1,5 +1,8 @@
 # Database Schema — Barnamej Bahraini
 
+
+⚠️ This file is the SINGLE SOURCE OF TRUTH for all database queries. Never assume or invent column names outside this document.
+
 This document defines the PostgreSQL database schema used in Supabase.
 It is the single source of truth for the backend data structure of:
 

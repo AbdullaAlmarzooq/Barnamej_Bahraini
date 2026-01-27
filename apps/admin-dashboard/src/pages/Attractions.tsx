@@ -9,7 +9,7 @@ import {
     deleteAttractionPhoto,
     setPrimaryPhoto
 } from '../api/client';
-import { type Attraction, type AttractionPhoto } from '../types';
+import { type Attraction, type AttractionPhoto, type AttractionCategory } from '../types';
 import Modal from '../components/Common/Modal';
 import './Attractions.css';
 
@@ -25,7 +25,7 @@ const Attractions = () => {
     const [photos, setPhotos] = useState<AttractionPhoto[]>([]);
     const [loadingPhotos, setLoadingPhotos] = useState(false);
     const [newPhotoUrl, setNewPhotoUrl] = useState('');
-    const [photoToDelete, setPhotoToDelete] = useState<number | null>(null);
+    const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
     useEffect(() => {
         loadAttractions();
@@ -45,7 +45,7 @@ const Attractions = () => {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this attraction?')) {
             return;
         }
@@ -59,7 +59,7 @@ const Attractions = () => {
         }
     };
 
-    const loadPhotos = async (attractionId: number) => {
+    const loadPhotos = async (attractionId: string) => {
         try {
             setLoadingPhotos(true);
             const attractionPhotos = await fetchAttractionPhotos(attractionId);
@@ -87,7 +87,7 @@ const Attractions = () => {
         }
     };
 
-    const handleDeletePhoto = (photoId: number) => {
+    const handleDeletePhoto = (photoId: string) => {
         setPhotoToDelete(photoId);
     };
 
@@ -105,7 +105,7 @@ const Attractions = () => {
         }
     };
 
-    const handleSetPrimary = async (photoId: number) => {
+    const handleSetPrimary = async (photoId: string) => {
         if (!editingAttraction) return;
 
         try {
@@ -146,11 +146,10 @@ const Attractions = () => {
         const attractionData = {
             name: formData.get('name') as string,
             description: formData.get('description') as string,
-            category: formData.get('category') as string,
+            category: (formData.get('category') as string).toLowerCase() as AttractionCategory, // schema uses lowercase
             location: formData.get('location') as string,
-            image: formData.get('image') as string,
-            rating: parseFloat(formData.get('rating') as string) || 0,
             price: parseFloat(formData.get('price') as string) || 0,
+            is_active: true,
         };
 
         try {
@@ -168,9 +167,9 @@ const Attractions = () => {
     };
 
     const filteredAttractions = attractions.filter(attraction =>
-        attraction.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        attraction.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        attraction.location.toLowerCase().includes(searchQuery.toLowerCase())
+        (attraction.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (attraction.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (attraction.location || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     if (loading) {
@@ -232,7 +231,7 @@ const Attractions = () => {
                                     <tr key={attraction.id}>
                                         <td>
                                             <img
-                                                src={attraction.image || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
+                                                src={attraction.primary_photo_path || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
                                                 alt={attraction.name}
                                                 className="attraction-thumbnail"
                                                 onError={(e) => {
@@ -244,14 +243,14 @@ const Attractions = () => {
                                         <td>
                                             <strong>{attraction.name}</strong>
                                             <div className="text-sm text-muted">
-                                                {attraction.description.substring(0, 60)}...
+                                                {(attraction.description || '').substring(0, 60)}...
                                             </div>
                                         </td>
                                         <td>
                                             <span className="badge badge-primary">{attraction.category}</span>
                                         </td>
-                                        <td>{attraction.location}</td>
-                                        <td>⭐ {attraction.rating.toFixed(1)}</td>
+                                        <td>{attraction.location || 'N/A'}</td>
+                                        <td>⭐ {(attraction.avg_rating || 0).toFixed(1)}</td>
                                         <td>BD {attraction.price?.toFixed(2) || '0.00'}</td>
                                         <td>
                                             <div className="flex gap-sm">
@@ -334,13 +333,15 @@ const Attractions = () => {
                             required
                         >
                             <option value="">Select a category</option>
-                            <option value="Historical">Historical</option>
-                            <option value="Landmark">Landmark</option>
-                            <option value="Nature">Nature</option>
-                            <option value="Religious">Religious</option>
-                            <option value="Museum">Museum</option>
-                            <option value="Shopping">Shopping</option>
-                            <option value="Entertainment">Entertainment</option>
+                            <option value="historical">Historical</option>
+                            <option value="landmark">Landmark</option>
+                            <option value="nature">Nature</option>
+                            <option value="religious">Religious</option>
+                            <option value="museum">Museum</option>
+                            <option value="cultural">Cultural</option>
+                            <option value="entertainment">Entertainment</option>
+                            <option value="shopping">Shopping</option>
+                            <option value="dining">Dining</option>
                         </select>
                     </div>
 
@@ -381,7 +382,7 @@ const Attractions = () => {
                             min="0"
                             max="5"
                             step="0.1"
-                            defaultValue={editingAttraction?.rating || 0}
+                            defaultValue={editingAttraction?.avg_rating || 0}
                         />
                     </div>
 
@@ -414,7 +415,7 @@ const Attractions = () => {
                                             {photos.map((photo) => (
                                                 <div key={photo.id} className="photo-item">
                                                     <img
-                                                        src={photo.url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
+                                                        src={photo.storage_path || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
                                                         alt="Attraction"
                                                         className="photo-thumbnail"
                                                         onError={(e) => {
@@ -422,11 +423,11 @@ const Attractions = () => {
                                                             e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E";
                                                         }}
                                                     />
-                                                    {photo.is_primary === 1 && (
+                                                    {photo.is_primary && (
                                                         <span className="badge badge-primary photo-badge">Primary</span>
                                                     )}
                                                     <div className="photo-actions">
-                                                        {photo.is_primary === 0 && (
+                                                        {!photo.is_primary && (
                                                             <button
                                                                 type="button"
                                                                 className="btn btn-sm btn-secondary"

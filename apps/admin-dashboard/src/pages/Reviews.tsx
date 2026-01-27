@@ -26,7 +26,7 @@ const Reviews = () => {
         }
     };
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this review?')) {
             return;
         }
@@ -71,12 +71,12 @@ const Reviews = () => {
                             <div key={review.id} className="review-item">
                                 <div className="review-header">
                                     <div>
-                                        <strong>{review.name}</strong>
+                                        <strong>{review.reviewer_name || 'Anonymous'}</strong>
                                         <span className="text-muted text-sm ml-sm">
                                             {new Date(review.created_at).toLocaleDateString()}
                                         </span>
                                         <div className="text-sm font-bold text-primary mt-1">
-                                            📍 {review.attraction_name || 'Unknown Attraction'}
+                                            📍 {review.attraction?.name || 'Unknown Attraction'}
                                         </div>
                                         <div className="text-xs text-muted mt-1">
                                             {review.age ? `Age: ${review.age}` : ''}
@@ -95,7 +95,7 @@ const Reviews = () => {
                                 <div className="review-ratings">
                                     <div className="rating-item">
                                         <span className="rating-label">Overall:</span>
-                                        <span className="rating-value">⭐ {review.rating?.toFixed(1) || 'N/A'}</span>
+                                        <span className="rating-value">⭐ {(review.overall_rating || 0).toFixed(1)}</span>
                                     </div>
                                     <div className="rating-item">
                                         <span className="rating-label">Price:</span>
