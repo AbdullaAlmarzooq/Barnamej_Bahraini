@@ -16,7 +16,7 @@ import type {
  */
 export async function getAttractions() {
     const { data, error } = await supabase
-        .from('attractions')
+        .from('attractions_with_photo')
         .select('*')
         .is('deleted_at', null)
         .eq('is_active', true)
@@ -30,7 +30,7 @@ export async function getAttractions() {
  */
 export async function getFeaturedAttractions(limit = 5) {
     const { data, error } = await supabase
-        .from('attractions')
+        .from('attractions_with_photo')
         .select('*')
         .is('deleted_at', null)
         .eq('is_active', true)
@@ -46,7 +46,7 @@ export async function getFeaturedAttractions(limit = 5) {
  */
 export async function getAttraction(id: string) {
     const { data, error } = await supabase
-        .from('attractions')
+        .from('attractions_with_photo')
         .select('*')
         .eq('id', id)
         .is('deleted_at', null)
@@ -73,7 +73,7 @@ export async function getAttractionWithPhoto(id: string) {
  */
 export async function getAttractionWithPhotos(id: string) {
     const { data, error } = await supabase
-        .from('attractions')
+        .from('attractions_with_photo')
         .select(`
       *,
       photos:attraction_photos(*)

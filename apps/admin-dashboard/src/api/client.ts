@@ -27,7 +27,7 @@ import type {
 
 export async function fetchAttractions(): Promise<Attraction[]> {
     const { data, error } = await supabase
-        .from('attractions')
+        .from('attractions_with_photo')
         .select(`
       *,
       photos:attraction_photos(*)
@@ -49,7 +49,7 @@ export async function fetchAttractions(): Promise<Attraction[]> {
 
 export async function fetchAttraction(id: string): Promise<Attraction> {
     const { data, error } = await supabase
-        .from('attractions')
+        .from('attractions_with_photo')
         .select(`
       *,
       photos:attraction_photos(*)

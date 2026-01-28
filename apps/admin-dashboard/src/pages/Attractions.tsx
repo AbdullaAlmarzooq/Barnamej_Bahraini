@@ -7,7 +7,8 @@ import {
     fetchAttractionPhotos,
     addAttractionPhoto,
     deleteAttractionPhoto,
-    setPrimaryPhoto
+    setPrimaryPhoto,
+    getPhotoUrl
 } from '../api/client';
 import { type Attraction, type AttractionPhoto, type AttractionCategory } from '../types';
 import Modal from '../components/Common/Modal';
@@ -114,7 +115,11 @@ const Attractions = () => {
             // Update local state to reflect change immediately in the form
             const selectedPhoto = photos.find(p => p.id === photoId);
             if (selectedPhoto) {
-                setEditingAttraction(prev => prev ? ({ ...prev, image: selectedPhoto.url }) : null);
+                setEditingAttraction(prev => prev ? ({
+                    ...prev,
+                    primary_photo_path: selectedPhoto.storage_path,
+                    primary_photo_bucket: selectedPhoto.storage_bucket
+                }) : null);
             }
 
             await loadPhotos(editingAttraction.id);
@@ -231,7 +236,11 @@ const Attractions = () => {
                                     <tr key={attraction.id}>
                                         <td>
                                             <img
-                                                src={attraction.primary_photo_path || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
+                                                src={
+                                                    attraction.primary_photo_path
+                                                        ? getPhotoUrl(attraction.primary_photo_path, attraction.primary_photo_bucket || 'attraction-images')
+                                                        : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"
+                                                }
                                                 alt={attraction.name}
                                                 className="attraction-thumbnail"
                                                 onError={(e) => {
@@ -319,7 +328,7 @@ const Attractions = () => {
                             name="description"
                             className="textarea"
                             placeholder="Brief description of the attraction and what makes it special..."
-                            defaultValue={editingAttraction?.description}
+                            defaultValue={editingAttraction?.description || ''}
                             required
                         />
                     </div>
@@ -352,25 +361,12 @@ const Attractions = () => {
                             name="location"
                             className="input"
                             placeholder="e.g., Manama, Muharraq, Riffa"
-                            defaultValue={editingAttraction?.location}
+                            defaultValue={editingAttraction?.location || ''}
                             required
                         />
                     </div>
 
-                    <div className="form-group">
-                        <label className="label">Main Image URL</label>
-                        <input
-                            type="text"
-                            name="image"
-                            className="input"
-                            placeholder="http://localhost:3000/assets/AttractionsPhotos/1/photo.jpg"
-                            defaultValue={editingAttraction?.image}
-                            required
-                        />
-                        <small className="text-muted">
-                            Photos stored in assets/AttractionsPhotos/{'{id}'}/ folder
-                        </small>
-                    </div>
+
 
                     <div className="form-group">
                         <label className="label">Initial Rating (0-5)</label>
@@ -415,7 +411,11 @@ const Attractions = () => {
                                             {photos.map((photo) => (
                                                 <div key={photo.id} className="photo-item">
                                                     <img
-                                                        src={photo.storage_path || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"}
+                                                        src={
+                                                            photo.storage_path
+                                                                ? getPhotoUrl(photo.storage_path, photo.storage_bucket)
+                                                                : "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3Crect fill='%23ddd' width='80' height='80'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dominant-baseline='middle' font-family='Arial' font-size='10'%3ENo Image%3C/text%3E%3C/svg%3E"
+                                                        }
                                                         alt="Attraction"
                                                         className="photo-thumbnail"
                                                         onError={(e) => {
