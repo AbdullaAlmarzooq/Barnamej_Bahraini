@@ -38,7 +38,13 @@ function getSupabaseConfig(): { url: string; anonKey: string } {
  * Called by entry points to ensure proper environment variables
  */
 export function initSupabase(url: string, anonKey: string): SupabaseClient {
-    supabaseInstance = createClient(url, anonKey)
+    supabaseInstance = createClient(url, anonKey, {
+        auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+        }
+    })
     return supabaseInstance
 }
 
@@ -50,7 +56,13 @@ export function getSupabase(): SupabaseClient {
     if (!supabaseInstance) {
         const { url, anonKey } = getSupabaseConfig()
         if (url) {
-            supabaseInstance = createClient(url, anonKey)
+            supabaseInstance = createClient(url, anonKey, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true
+                }
+            })
         } else {
             throw new Error('Supabase not initialized. Call initSupabase() first or set environment variables.')
         }

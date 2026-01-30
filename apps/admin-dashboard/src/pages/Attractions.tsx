@@ -148,21 +148,25 @@ const Attractions = () => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
 
+        if (!editingAttraction) return;
+
+
         const attractionData = {
             name: formData.get('name') as string,
             description: formData.get('description') as string,
-            category: (formData.get('category') as string).toLowerCase() as AttractionCategory, // schema uses lowercase
+            category: (formData.get('category') as string).toLowerCase() as AttractionCategory,
             location: formData.get('location') as string,
             price: parseFloat(formData.get('price') as string) || 0,
+            avg_rating: parseFloat(formData.get('rating') as string) || 0,
             is_active: true,
         };
 
+        console.log('Editing attraction ID:', editingAttraction?.id);
+        console.log('Attraction data to update:', attractionData);
+
         try {
-            if (editingAttraction) {
-                await updateAttraction(editingAttraction.id, attractionData);
-            } else {
-                await createAttraction(attractionData);
-            }
+            const result = await updateAttraction(editingAttraction.id, attractionData);
+            console.log('Update result:', result);
             setIsModalOpen(false);
             await loadAttractions();
         } catch (err) {
@@ -309,7 +313,7 @@ const Attractions = () => {
                     </>
                 }
             >
-                <form id="attraction-form" onSubmit={handleSubmit}>
+                <form id="attraction-form" onSubmit={handleSubmit} key={editingAttraction?.id || 'new'}>
                     <div className="form-group">
                         <label className="label">Name</label>
                         <input

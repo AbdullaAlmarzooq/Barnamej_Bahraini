@@ -80,14 +80,21 @@ export async function createAttraction(input: Partial<Attraction>): Promise<{ id
     return { id: data.id }
 }
 
-export async function updateAttraction(id: string, input: Partial<Attraction>): Promise<{ success: boolean }> {
-    const { error } = await supabase
+export async function updateAttraction(id: string, input: Partial<Attraction>): Promise<{ success: boolean; data?: Attraction }> {
+    const { data, error } = await supabase
         .from('attractions')
         .update(input)
         .eq('id', id)
+        .select()
 
     if (error) throw new Error(error.message)
-    return { success: true }
+
+    // Check if any row was actually updated
+    if (!data || data.length === 0) {
+        throw new Error('Update failed: Attraction not found or permission denied')
+    }
+
+    return { success: true, data: data[0] }
 }
 
 export async function deleteAttraction(id: string): Promise<{ success: boolean }> {

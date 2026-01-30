@@ -1,20 +1,16 @@
-import { type ReactNode } from 'react';
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import './Layout.css';
 
-interface LayoutProps {
-    children: ReactNode;
-}
-
-const Layout = ({ children }: LayoutProps) => {
+const Layout = () => {
     return (
         <div className="layout">
             <Sidebar />
             <div className="layout-main">
                 <Header />
                 <main className="layout-content">
-                    {children}
+                    <Outlet />
                 </main>
             </div>
         </div>

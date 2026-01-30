@@ -5,10 +5,10 @@ const Sidebar = () => {
   const location = useLocation();
 
   const menuItems = [
-    { path: '/', label: 'Dashboard', icon: '📊' },
-    { path: '/attractions', label: 'Attractions', icon: '🏛️' },
-    { path: '/reviews', label: 'Reviews', icon: '⭐' },
-    { path: '/itineraries', label: 'Itineraries', icon: '🗺️' },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/admin/attractions', label: 'Attractions', icon: '🏛️' },
+    { path: '/admin/reviews', label: 'Reviews', icon: '⭐' },
+    { path: '/admin/itineraries', label: 'Itineraries', icon: '🗺️' },
   ];
 
   return (
