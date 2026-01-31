@@ -118,6 +118,7 @@ export interface Itinerary {
     deleted_at: string | null;
     // Joined data
     attractions?: ItineraryAttraction[];
+    creator?: { full_name: string | null };
 }
 
 export interface ItineraryAttraction {

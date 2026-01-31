@@ -4,12 +4,8 @@ import {
     deleteAttraction,
     createAttraction,
     updateAttraction,
-    fetchAttractionPhotos,
-    addAttractionPhoto,
-    deleteAttractionPhoto,
-    setPrimaryPhoto,
-    getPhotoUrl
 } from '../api/client';
+import { fetchAttractionPhotos, uploadAttractionPhoto, deleteAttractionPhoto, setPrimaryPhoto, getPhotoUrl } from '../api/photos'
 import { type Attraction, type AttractionPhoto, type AttractionCategory } from '../types';
 import Modal from '../components/Common/Modal';
 import './Attractions.css';
@@ -25,7 +21,6 @@ const Attractions = () => {
     // Photo management state
     const [photos, setPhotos] = useState<AttractionPhoto[]>([]);
     const [loadingPhotos, setLoadingPhotos] = useState(false);
-    const [newPhotoUrl, setNewPhotoUrl] = useState('');
     const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
 
     useEffect(() => {
@@ -69,22 +64,6 @@ const Attractions = () => {
             console.error('Failed to load photos:', err);
         } finally {
             setLoadingPhotos(false);
-        }
-    };
-
-    const handleAddPhoto = async () => {
-        if (!editingAttraction || !newPhotoUrl.trim()) {
-            return;
-        }
-
-        try {
-            await addAttractionPhoto(editingAttraction.id, newPhotoUrl);
-            setNewPhotoUrl('');
-            await loadPhotos(editingAttraction.id);
-            await loadAttractions(); // Refresh to update primary image if needed
-        } catch (err) {
-            alert('Failed to add photo');
-            console.error(err);
         }
     };
 
@@ -140,7 +119,6 @@ const Attractions = () => {
     const handleAdd = () => {
         setEditingAttraction(null);
         setPhotos([]);
-        setNewPhotoUrl('');
         setIsModalOpen(true);
     };
 
@@ -188,6 +166,25 @@ const Attractions = () => {
             </div>
         );
     }
+
+    const handleFileUpload = async (file: File) => {
+    if (!editingAttraction) return
+
+    try {
+        const newPhoto = await uploadAttractionPhoto(editingAttraction.id, file)
+
+        if (photos.length === 0) {
+        await setPrimaryPhoto(newPhoto.id)
+        }
+
+        await loadPhotos(editingAttraction.id)
+        await loadAttractions()
+    } catch (err) {
+            alert('Failed to upload photo')
+            console.error(err)
+        }
+    }
+
 
     return (
         <div className="attractions-page">
@@ -398,7 +395,6 @@ const Attractions = () => {
                             defaultValue={editingAttraction?.price || 0}
                         />
                     </div>
-
                     {/* Photo Gallery Section - Only show when editing */}
                     {editingAttraction && (
                         <>
@@ -451,26 +447,17 @@ const Attractions = () => {
                                                 </div>
                                             ))}
                                         </div>
-
                                         <div className="add-photo-section">
-                                            <label className="label">Add New Photo</label>
-                                            <div className="flex gap-sm">
-                                                <input
-                                                    type="text"
-                                                    className="input"
-                                                    placeholder="http://localhost:3000/assets/AttractionsPhotos/{id}/photo.jpg"
-                                                    value={newPhotoUrl}
-                                                    onChange={(e) => setNewPhotoUrl(e.target.value)}
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-primary"
-                                                    onClick={handleAddPhoto}
-                                                    disabled={!newPhotoUrl.trim()}
-                                                >
-                                                    ➕ Add
-                                                </button>
-                                            </div>
+                                            <label className="label">Upload New Photo</label>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => {
+                                                    if (e.target.files?.[0]) {
+                                                        handleFileUpload(e.target.files[0])
+                                                    }
+                                                }}
+                                            />
                                         </div>
                                     </>
                                 )}

@@ -1,27 +1,56 @@
+import { supabase } from '../api/client';
 import { useState, useEffect } from 'react';
-import { fetchItineraries, deleteItinerary, createItinerary, updateItinerary, fetchItinerary, fetchAttractions, addItineraryAttraction, removeItineraryAttraction, updateItineraryAttraction } from '../api/client';
-import { type Itinerary, type Attraction } from '../types';
+import {
+    fetchItineraries,
+    deleteItinerary,
+    createItinerary,
+    updateItinerary,
+    fetchItinerary,
+    addItineraryAttraction,
+    removeItineraryAttraction,
+    updateItineraryAttraction
+} from '../api/itineraries';
+import { fetchAttractions } from '../api/client';
+import { type Itinerary, type Attraction, type ItineraryAttraction } from '../types';
 import Modal from '../components/Common/Modal';
 import './Itineraries.css';
+interface UserProfile {
+    id: string;
+    email: string;
+    name: string;
+}
 
 const Itineraries = () => {
     const [itineraries, setItineraries] = useState<Itinerary[]>([]);
-    const [allAttractions, setAllAttractions] = useState<Attraction[]>([]); // For dropdown
+    const [allAttractions, setAllAttractions] = useState<Attraction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [filter, setFilter] = useState<'all' | 'public' | 'private'>('all');
+    const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingItinerary, setEditingItinerary] = useState<Itinerary | null>(null);
-    const [itineraryToDelete, setItineraryToDelete] = useState<number | null>(null);
+    const [itineraryToDelete, setItineraryToDelete] = useState<string | null>(null);
 
-    // Attraction selection state
-    const [selectedAttractionId, setSelectedAttractionId] = useState<number | null>(null);
+    // Attraction selection state inside Modal
+    const [selectedAttractionId, setSelectedAttractionId] = useState<string | null>(null);
 
     useEffect(() => {
         loadData();
+        getUser();
     }, []);
+
+    const getUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            setCurrentUser({
+                id: user.id,
+                email: user.email || '',
+                name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'
+            });
+        }
+    };
 
     const loadData = async () => {
         try {
@@ -31,8 +60,8 @@ const Itineraries = () => {
                 fetchItineraries('all'),
                 fetchAttractions()
             ]);
-            setItineraries(itinerariesData);
-            setAllAttractions(attractionsData);
+            setItineraries(itinerariesData || []);
+            setAllAttractions(attractionsData || []);
         } catch (err) {
             setError('Failed to load data');
             console.error(err);
@@ -42,11 +71,15 @@ const Itineraries = () => {
     };
 
     const loadItineraries = async () => {
-        const data = await fetchItineraries('all');
-        setItineraries(data);
+        try {
+            const data = await fetchItineraries('all');
+            setItineraries(data || []);
+        } catch (err) {
+            console.error("Error refreshing itineraries", err);
+        }
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = (id: string) => {
         setItineraryToDelete(id);
     };
 
@@ -71,7 +104,7 @@ const Itineraries = () => {
 
     const handleEdit = async (itinerary: Itinerary) => {
         try {
-            // Fetch full details including attractions
+            // Fetch full details (joins) before opening modal
             const fullDetails = await fetchItinerary(itinerary.id);
             setEditingItinerary(fullDetails);
             setSelectedAttractionId(null);
@@ -89,21 +122,34 @@ const Itineraries = () => {
         const itineraryData = {
             name: formData.get('name') as string,
             description: formData.get('description') as string,
-            creator_name: formData.get('creator_name') as string,
-            is_public: formData.get('is_public') === 'on'
+            // Only send user_id if we are creating new, updates usually don't change owner
+            ...(editingItinerary ? {} : { user_id: currentUser?.id }),
+            is_public: formData.get('is_public') === 'on', // Checkbox logic
         };
 
         try {
             if (editingItinerary && editingItinerary.id) {
+                // Update
                 await updateItinerary(editingItinerary.id, itineraryData);
-                setIsModalOpen(false);
+                // Refresh the specific itinerary in the modal to show changes
+                const updated = await fetchItinerary(editingItinerary.id);
+                setEditingItinerary(updated);
+
+                alert("Itinerary updated successfully!");
                 await loadItineraries();
+                // We keep modal open or close it? usually close on save
+                // setIsModalOpen(false); 
             } else {
-                const response = await createItinerary(itineraryData);
-                const newItinerary = await fetchItinerary(response.id);
-                setEditingItinerary(newItinerary);
-                // Keep modal open for adding attractions
-                await loadItineraries();
+                // Create
+                const response = await createItinerary(itineraryData, currentUser?.id || '');
+
+                if (response && response.id) {
+                    // Fetch full object to switch modal to "Edit Mode" so they can add attractions
+                    const newItinerary = await fetchItinerary(response.id);
+                    setEditingItinerary(newItinerary);
+                    await loadItineraries();
+                    alert("Itinerary created! You can now add attractions below.");
+                }
             }
         } catch (err) {
             alert('Failed to save itinerary');
@@ -111,30 +157,37 @@ const Itineraries = () => {
         }
     };
 
-    // manage attractions logic
+    // --- Manage Attractions Logic ---
+
     const handleAddAttraction = async () => {
-        if (!editingItinerary || !selectedAttractionId) return;
+        if (!editingItinerary || !editingItinerary.id || !selectedAttractionId) return;
 
         try {
             await addItineraryAttraction(editingItinerary.id, selectedAttractionId);
+
+            // Refresh modal data
             const updated = await fetchItinerary(editingItinerary.id);
             setEditingItinerary(updated);
-            setSelectedAttractionId(null);
-            await loadItineraries(); // Update main list counts/prices
+
+            setSelectedAttractionId(null); // Reset dropdown
+            await loadItineraries(); // Update main list (prices/counts)
         } catch (err) {
             alert('Failed to add attraction');
             console.error(err);
         }
     };
 
-    const handleRemoveAttraction = async (attractionId: number) => {
-        if (!editingItinerary) return;
+    const handleRemoveAttraction = async (attractionId: string) => {
+        if (!editingItinerary || !editingItinerary.id) return;
         if (!confirm('Remove this attraction from the itinerary?')) return;
 
         try {
             await removeItineraryAttraction(editingItinerary.id, attractionId);
+
+            // Refresh modal data
             const updated = await fetchItinerary(editingItinerary.id);
             setEditingItinerary(updated);
+
             await loadItineraries();
         } catch (err) {
             alert('Failed to remove attraction');
@@ -142,16 +195,18 @@ const Itineraries = () => {
         }
     };
 
-    const handleUpdateAttractionDetail = async (linkId: number, field: string, value: string | number) => {
+    const handleUpdateAttractionDetail = async (linkId: string, field: string, value: string | number) => {
         try {
             await updateItineraryAttraction(linkId, { [field]: value });
-            // Ideally we'd refresh, but to avoid losing focus we might just rely on the API success
-            // or silent refresh. For now, let's just log success.
             console.log('Updated', field, value);
+            // Optional: Silent refresh or toast notification
         } catch (err) {
             console.error('Failed to update detail', err);
+            alert("Failed to save change");
         }
     };
+
+    // --- Filtering ---
 
     const filteredItineraries = itineraries.filter(itinerary => {
         if (filter === 'public') return itinerary.is_public;
@@ -184,24 +239,15 @@ const Itineraries = () => {
             <div className="card">
                 <div className="card-header">
                     <div className="filter-buttons">
-                        <button
-                            className={`btn ${filter === 'all' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                            onClick={() => setFilter('all')}
-                        >
-                            All ({itineraries.length})
-                        </button>
-                        <button
-                            className={`btn ${filter === 'public' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                            onClick={() => setFilter('public')}
-                        >
-                            Public ({itineraries.filter(i => i.is_public).length})
-                        </button>
-                        <button
-                            className={`btn ${filter === 'private' ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                            onClick={() => setFilter('private')}
-                        >
-                            Private ({itineraries.filter(i => !i.is_public).length})
-                        </button>
+                        {(['all', 'public', 'private'] as const).map((f) => (
+                            <button
+                                key={f}
+                                className={`btn ${filter === f ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+                                onClick={() => setFilter(f)}
+                            >
+                                {f.charAt(0).toUpperCase() + f.slice(1)}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -236,14 +282,15 @@ const Itineraries = () => {
                                                 </div>
                                             )}
                                         </td>
-                                        <td>{itinerary.creator_name}</td>
+                                        {/* Optional chaining in case creator is missing */}
+                                        <td>{itinerary.creator_name || itinerary.creator?.full_name || 'Unknown'}</td>
                                         <td>
                                             <span className={`badge ${itinerary.is_public ? 'badge-success' : 'badge-secondary'}`}>
                                                 {itinerary.is_public ? '🌐 Public' : '🔒 Private'}
                                             </span>
                                         </td>
-                                        <td>{itinerary.attraction_count || 0}</td>
-                                        <td>BD {itinerary.total_price?.toFixed(2) || '0.00'}</td>
+                                        <td>{itinerary.total_attractions || 0}</td>
+                                        <td>BD {(itinerary.total_price || 0).toFixed(2)}</td>
                                         <td>
                                             <span className="text-sm">
                                                 {new Date(itinerary.created_at).toLocaleDateString()}
@@ -278,7 +325,7 @@ const Itineraries = () => {
                 isOpen={isModalOpen}
                 onClose={() => {
                     setIsModalOpen(false);
-                    loadItineraries(); // Refresh on close to ensure strict consistency
+                    loadItineraries();
                 }}
                 title={editingItinerary ? 'Edit Itinerary' : 'Create Itinerary'}
                 className="modal-wide"
@@ -296,12 +343,13 @@ const Itineraries = () => {
                             form="itinerary-form"
                             className="btn btn-primary"
                         >
-                            {editingItinerary ? 'Save Changes' : 'Create Itinerary'}
+                            {editingItinerary ? 'Save Changes' : 'Create & Continue'}
                         </button>
                     </>
                 }
             >
                 <form id="itinerary-form" onSubmit={handleSubmit}>
+                    {/* Name */}
                     <div className="form-group">
                         <label className="label">Name</label>
                         <input
@@ -314,27 +362,33 @@ const Itineraries = () => {
                         />
                     </div>
 
+                    {/* Description */}
                     <div className="form-group">
                         <label className="label">Description</label>
                         <textarea
                             name="description"
                             className="textarea"
                             placeholder="Brief description of the trip..."
-                            defaultValue={editingItinerary?.description}
+                            defaultValue={editingItinerary?.description || ''}
                         />
                     </div>
 
+                    {/* Creator Display */}
                     <div className="form-group">
-                        <label className="label">Creator Name</label>
+                        <label className="label">Creator</label>
                         <input
                             type="text"
-                            name="creator_name"
                             className="input"
-                            placeholder="e.g., John Doe"
-                            defaultValue={editingItinerary?.creator_name || 'Admin'}
+                            value={
+                                // Use editingItinerary name, OR current user name if creating new
+                                editingItinerary?.creator_name || editingItinerary?.creator?.full_name || currentUser?.name || ''
+                            }
+                            readOnly
+                            disabled
                         />
                     </div>
 
+                    {/* Public checkbox */}
                     <div className="form-group">
                         <label className="checkbox-label">
                             <input
@@ -346,7 +400,7 @@ const Itineraries = () => {
                         </label>
                     </div>
 
-                    {/* Manage Attractions Section - Only when editing */}
+                    {/* Manage Attractions - Only when editing existing itinerary */}
                     {editingItinerary && editingItinerary.id && (
                         <>
                             <hr style={{ margin: '24px 0', border: '1px solid #eee' }} />
@@ -356,7 +410,7 @@ const Itineraries = () => {
                                 <select
                                     className="select"
                                     value={selectedAttractionId || ''}
-                                    onChange={(e) => setSelectedAttractionId(Number(e.target.value))}
+                                    onChange={(e) => setSelectedAttractionId(e.target.value)}
                                 >
                                     <option value="">Select attraction to add...</option>
                                     {allAttractions.map(attr => (
@@ -380,10 +434,10 @@ const Itineraries = () => {
                                     <thead>
                                         <tr>
                                             <th>Attraction</th>
-                                            <th style={{ width: '100px' }}>Start</th>
-                                            <th style={{ width: '100px' }}>End</th>
+                                            <th style={{ width: '110px' }}>Start</th>
+                                            <th style={{ width: '110px' }}>End</th>
                                             <th style={{ width: '80px' }}>Price</th>
-                                            <th style={{ width: '120px' }}>Notes</th>
+                                            <th>Notes</th>
                                             <th style={{ width: '50px' }}></th>
                                         </tr>
                                     </thead>
@@ -393,31 +447,31 @@ const Itineraries = () => {
                                                 <td colSpan={6} className="text-center text-muted">No attractions added yet.</td>
                                             </tr>
                                         ) : (
-                                            editingItinerary.attractions.map(ia => (
-                                                <tr key={ia.link_id}>
+                                            editingItinerary.attractions.map((ia: ItineraryAttraction) => (
+                                                <tr key={ia.id}>
                                                     <td>
-                                                        <div className="font-bold">{ia.name}</div>
-                                                        <div className="text-xs text-muted">{ia.category}</div>
+                                                        <div className="font-bold">{ia.attraction?.name || 'Unknown Attraction'}</div>
+                                                        <div className="text-xs text-muted">{ia.attraction?.category}</div>
                                                     </td>
                                                     <td>
                                                         <input
                                                             type="time"
                                                             className="input input-sm"
-                                                            defaultValue={ia.start_time || ''}
-                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.link_id, 'start_time', e.target.value)}
+                                                            defaultValue={ia.scheduled_start_time || ''}
+                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_start_time', e.target.value)}
                                                         />
                                                     </td>
                                                     <td>
                                                         <input
                                                             type="time"
                                                             className="input input-sm"
-                                                            defaultValue={ia.end_time || ''}
-                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.link_id, 'end_time', e.target.value)}
+                                                            defaultValue={ia.scheduled_end_time || ''}
+                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_end_time', e.target.value)}
                                                         />
                                                     </td>
                                                     <td>
                                                         <div className="py-2 text-sm text-center">
-                                                            {ia.price ? `BD ${ia.price.toFixed(3)}` : 'Free'}
+                                                            {ia.attraction?.price ? `BD ${ia.attraction.price.toFixed(3)}` : 'Free'}
                                                         </div>
                                                     </td>
                                                     <td>
@@ -426,14 +480,16 @@ const Itineraries = () => {
                                                             className="input input-sm"
                                                             defaultValue={ia.notes || ''}
                                                             placeholder="Notes..."
-                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.link_id, 'notes', e.target.value)}
+                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'notes', e.target.value)}
                                                         />
                                                     </td>
                                                     <td>
                                                         <button
                                                             type="button"
                                                             className="btn btn-danger btn-sm"
-                                                            onClick={() => handleRemoveAttraction(ia.id)}
+                                                            // Pass attraction_id here assuming API needs the FK, 
+                                                            // if API needs link ID, switch to ia.id
+                                                            onClick={() => handleRemoveAttraction(ia.attraction_id)}
                                                             title="Remove attraction"
                                                         >
                                                             ✕
@@ -445,8 +501,13 @@ const Itineraries = () => {
                                     </tbody>
                                 </table>
                             </div>
+
                             <div className="mt-2 text-right font-bold">
-                                Total Price: BD {editingItinerary.attractions?.reduce((sum, item) => sum + (item.price || 0), 0).toFixed(2) || '0.00'}
+                                Total Price: BD {
+                                    (editingItinerary.attractions || [])
+                                        .reduce((sum, item) => sum + (item.attraction?.price || 0), 0)
+                                        .toFixed(3)
+                                }
                             </div>
                         </>
                     )}
