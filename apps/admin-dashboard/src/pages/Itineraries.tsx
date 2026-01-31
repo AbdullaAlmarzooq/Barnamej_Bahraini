@@ -340,6 +340,7 @@ const Itineraries = () => {
                 onClose={() => setIsModalOpen(false)}
                 title={editingItinerary ? 'Edit Itinerary' : 'Create New Itinerary'}
                 closeOnOverlayClick={false}
+                className="modal-wide"
                 footer={
                     <button type="submit" form="itinerary-form" className="btn btn-primary">
                         {editingItinerary ? 'Save Changes' : 'Create Itinerary'}

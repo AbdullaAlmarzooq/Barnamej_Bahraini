@@ -15,12 +15,12 @@
     flex: 1;
     margin-top: var(--header-height);
     padding: var(--space-xl);
-    max-width: 1400px;
+    max-width: 2000px;
     width: 100%;
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
+@media (max-width: 2000px) {
     .layout-content {
         padding: var(--space-md);
     }
