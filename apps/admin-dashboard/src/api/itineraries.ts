@@ -7,7 +7,7 @@ export async function fetchItineraries(filter: 'all' | 'public' | 'private' = 'a
         .from('itineraries')
         .select(`
             *,
-            creator:profiles(full_name)
+            creator:profiles!user_id(id, full_name, email)
         `)
         .is('deleted_at', null)
         .eq('is_active', true)
@@ -28,7 +28,7 @@ export async function fetchItinerary(id: string): Promise<Itinerary> {
         .from('itineraries')
         .select(`
             *,
-            creator:profiles(full_name),
+            creator:profiles!user_id(id, full_name, email),
             attractions:itinerary_attractions(
                 *,
                 attraction:attractions(*)
@@ -50,13 +50,14 @@ export async function fetchItinerary(id: string): Promise<Itinerary> {
 }
 
 
-// Create itinerary and automatically set creator_id
-export async function createItinerary(input: Partial<Itinerary>, userId: string): Promise<{ id: string }> {
+// Create itinerary and automatically set user_id and creator_name
+export async function createItinerary(input: Partial<Itinerary>, userId: string, creatorName?: string): Promise<{ id: string }> {
     const { data, error } = await supabase
         .from('itineraries')
         .insert({
             ...input,
-            creator_id: userId,  // <- automatically save logged-in user
+            user_id: userId,  // <- correct column name is user_id, not creator_id
+            creator_name: creatorName || input.creator_name, // <- store the creator's name
             is_public: input.is_public ?? false,
             is_active: true,
         })

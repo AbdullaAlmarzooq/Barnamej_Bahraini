@@ -44,11 +44,27 @@ const Itineraries = () => {
     const getUser = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
-            setCurrentUser({
-                id: user.id,
-                email: user.email || '',
-                name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'
-            });
+            // Fetch the user's profile from profiles table
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('id, email, full_name')
+                .eq('id', user.id)
+                .single();
+
+            if (profile) {
+                setCurrentUser({
+                    id: profile.id,
+                    email: profile.email || '',
+                    name: profile.full_name || profile.email || 'User'
+                });
+            } else {
+                // Fallback if profile doesn't exist
+                setCurrentUser({
+                    id: user.id,
+                    email: user.email || '',
+                    name: user.user_metadata?.full_name || user.user_metadata?.name || user.email || 'User'
+                });
+            }
         }
     };
 
@@ -140,8 +156,12 @@ const Itineraries = () => {
                 // We keep modal open or close it? usually close on save
                 // setIsModalOpen(false); 
             } else {
-                // Create
-                const response = await createItinerary(itineraryData, currentUser?.id || '');
+                // Create - pass the creator's name from currentUser
+                const response = await createItinerary(
+                    itineraryData,
+                    currentUser?.id || '',
+                    currentUser?.name // Pass the user's full name
+                );
 
                 if (response && response.id) {
                     // Fetch full object to switch modal to "Edit Mode" so they can add attractions
@@ -169,8 +189,8 @@ const Itineraries = () => {
             const updated = await fetchItinerary(editingItinerary.id);
             setEditingItinerary(updated);
 
-            setSelectedAttractionId(null); // Reset dropdown
-            await loadItineraries(); // Update main list (prices/counts)
+            // Clear selection
+            setSelectedAttractionId(null);
         } catch (err) {
             alert('Failed to add attraction');
             console.error(err);
@@ -179,225 +199,211 @@ const Itineraries = () => {
 
     const handleRemoveAttraction = async (attractionId: string) => {
         if (!editingItinerary || !editingItinerary.id) return;
-        if (!confirm('Remove this attraction from the itinerary?')) return;
+
+        if (!window.confirm("Remove this attraction from itinerary?")) {
+            return;
+        }
 
         try {
             await removeItineraryAttraction(editingItinerary.id, attractionId);
-
-            // Refresh modal data
             const updated = await fetchItinerary(editingItinerary.id);
             setEditingItinerary(updated);
-
-            await loadItineraries();
         } catch (err) {
             alert('Failed to remove attraction');
             console.error(err);
         }
     };
 
-    const handleUpdateAttractionDetail = async (linkId: string, field: string, value: string | number) => {
+    const handleUpdateAttractionDetail = async (linkId: string, field: string, value: any) => {
         try {
             await updateItineraryAttraction(linkId, { [field]: value });
-            console.log('Updated', field, value);
-            // Optional: Silent refresh or toast notification
+            // Optionally refresh to show updated totals, or just let user continue
         } catch (err) {
             console.error('Failed to update detail', err);
-            alert("Failed to save change");
         }
     };
 
-    // --- Filtering ---
-
-    const filteredItineraries = itineraries.filter(itinerary => {
-        if (filter === 'public') return itinerary.is_public;
-        if (filter === 'private') return !itinerary.is_public;
-        return true;
+    // --- Rendering logic ---
+    const filteredItineraries = itineraries.filter(itin => {
+        if (filter === 'public') return itin.is_public;
+        if (filter === 'private') return !itin.is_public;
+        return true; // all
     });
 
-    if (loading) {
-        return (
-            <div className="loading-container">
-                <div className="spinner"></div>
-            </div>
-        );
-    }
+    if (loading) return <div className="loading">Loading itineraries...</div>;
+    if (error) return <div className="error">{error}</div>;
 
     return (
-        <div className="itineraries-page">
+        <div className="page-container">
             <div className="page-header">
-                <div>
-                    <h1>Itineraries Management</h1>
-                    <p className="text-muted">View and manage user itineraries</p>
+                <h1>Itineraries</h1>
+                <div className="page-actions">
+                    <div className="filter-group">
+                        <label>Filter:</label>
+                        <select
+                            className="select"
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value as typeof filter)}
+                        >
+                            <option value="all">All</option>
+                            <option value="public">Public</option>
+                            <option value="private">Private</option>
+                        </select>
+                    </div>
+                    <button className="btn btn-primary" onClick={handleAdd}>
+                        + New Itinerary
+                    </button>
                 </div>
-                <button className="btn btn-primary" onClick={handleAdd}>
-                    ➕ Add Itinerary
-                </button>
             </div>
 
-            {error && <div className="error-message">{error}</div>}
-
-            <div className="card">
-                <div className="card-header">
-                    <div className="filter-buttons">
-                        {(['all', 'public', 'private'] as const).map((f) => (
-                            <button
-                                key={f}
-                                className={`btn ${filter === f ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-                                onClick={() => setFilter(f)}
-                            >
-                                {f.charAt(0).toUpperCase() + f.slice(1)}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="table-container">
-                    <table className="table">
-                        <thead>
+            <div className="table-container">
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Creator</th>
+                            <th>Attractions</th>
+                            <th>Duration</th>
+                            <th>Total Price</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredItineraries.length === 0 ? (
                             <tr>
-                                <th>Name</th>
-                                <th>Creator</th>
-                                <th>Visibility</th>
-                                <th>Attractions</th>
-                                <th>Total Price</th>
-                                <th>Created</th>
-                                <th>Actions</th>
+                                <td colSpan={7} className="text-center text-muted">
+                                    No itineraries found
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {filteredItineraries.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="text-center text-muted">
-                                        No itineraries found
+                        ) : (
+                            filteredItineraries.map((itinerary) => (
+                                <tr key={itinerary.id}>
+                                    <td>
+                                        <div className="font-bold">{itinerary.name}</div>
+                                        {itinerary.description && (
+                                            <div className="text-xs text-muted">
+                                                {itinerary.description.substring(0, 60)}
+                                                {itinerary.description.length > 60 && '...'}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td>
+                                        {/* Use creator.full_name from profiles join, fallback to creator_name field, then 'Unknown' */}
+                                        {itinerary.creator?.full_name || itinerary.creator_name || 'Unknown User'}
+                                    </td>
+                                    <td className="text-center">
+                                        {itinerary.total_attractions || 0}
+                                    </td>
+                                    <td className="text-center">
+                                        {itinerary.estimated_duration_minutes
+                                            ? `${Math.floor(itinerary.estimated_duration_minutes / 60)}h ${itinerary.estimated_duration_minutes % 60}m`
+                                            : '-'}
+                                    </td>
+                                    <td className="text-center">
+                                        BD {itinerary.total_price?.toFixed(3) || '0.000'}
+                                    </td>
+                                    <td>
+                                        <span className={`badge ${itinerary.is_public ? 'badge-success' : 'badge-warning'}`}>
+                                            {itinerary.is_public ? 'Public' : 'Private'}
+                                        </span>
+                                        {itinerary.is_featured && (
+                                            <span className="badge badge-info ml-1">Featured</span>
+                                        )}
+                                    </td>
+                                    <td>
+                                        <div className="btn-group">
+                                            <button
+                                                className="btn btn-sm btn-secondary"
+                                                onClick={() => handleEdit(itinerary)}
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                className="btn btn-sm btn-danger"
+                                                onClick={() => handleDelete(itinerary.id)}
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                            ) : (
-                                filteredItineraries.map((itinerary) => (
-                                    <tr key={itinerary.id}>
-                                        <td>
-                                            <strong>{itinerary.name}</strong>
-                                            {itinerary.description && (
-                                                <div className="text-sm text-muted">
-                                                    {itinerary.description.substring(0, 60)}...
-                                                </div>
-                                            )}
-                                        </td>
-                                        {/* Optional chaining in case creator is missing */}
-                                        <td>{itinerary.creator_name || itinerary.creator?.full_name || 'Unknown'}</td>
-                                        <td>
-                                            <span className={`badge ${itinerary.is_public ? 'badge-success' : 'badge-secondary'}`}>
-                                                {itinerary.is_public ? '🌐 Public' : '🔒 Private'}
-                                            </span>
-                                        </td>
-                                        <td>{itinerary.total_attractions || 0}</td>
-                                        <td>BD {(itinerary.total_price || 0).toFixed(2)}</td>
-                                        <td>
-                                            <span className="text-sm">
-                                                {new Date(itinerary.created_at).toLocaleDateString()}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="flex gap-sm">
-                                                <button
-                                                    className="btn btn-secondary btn-sm"
-                                                    onClick={() => handleEdit(itinerary)}
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button
-                                                    className="btn btn-danger btn-sm"
-                                                    onClick={() => handleDelete(itinerary.id)}
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            ))
+                        )}
+                    </tbody>
+                </table>
             </div>
 
-            {/* Edit/Create Modal */}
+            {/* Create/Edit Itinerary Modal */}
             <Modal
                 isOpen={isModalOpen}
-                onClose={() => {
-                    setIsModalOpen(false);
-                    loadItineraries();
-                }}
-                title={editingItinerary ? 'Edit Itinerary' : 'Create Itinerary'}
-                className="modal-wide"
+                onClose={() => setIsModalOpen(false)}
+                title={editingItinerary ? 'Edit Itinerary' : 'Create New Itinerary'}
+                closeOnOverlayClick={false}
                 footer={
-                    <>
-                        <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => setIsModalOpen(false)}
-                        >
-                            Close
-                        </button>
-                        <button
-                            type="submit"
-                            form="itinerary-form"
-                            className="btn btn-primary"
-                        >
-                            {editingItinerary ? 'Save Changes' : 'Create & Continue'}
-                        </button>
-                    </>
+                    <button type="submit" form="itinerary-form" className="btn btn-primary">
+                        {editingItinerary ? 'Save Changes' : 'Create Itinerary'}
+                    </button>
                 }
             >
-                <form id="itinerary-form" onSubmit={handleSubmit}>
-                    {/* Name */}
+                <form id="itinerary-form" onSubmit={handleSubmit} className="form">
                     <div className="form-group">
-                        <label className="label">Name</label>
+                        <label className="form-label required">Name</label>
                         <input
                             type="text"
                             name="name"
                             className="input"
-                            placeholder="e.g., Weekend in Manama"
-                            defaultValue={editingItinerary?.name}
                             required
+                            defaultValue={editingItinerary?.name || ''}
                         />
                     </div>
 
-                    {/* Description */}
                     <div className="form-group">
-                        <label className="label">Description</label>
+                        <label className="form-label">Description</label>
                         <textarea
                             name="description"
                             className="textarea"
-                            placeholder="Brief description of the trip..."
+                            rows={3}
                             defaultValue={editingItinerary?.description || ''}
                         />
                     </div>
 
-                    {/* Creator Display */}
+                    {/* Creator Name (read-only) */}
                     <div className="form-group">
-                        <label className="label">Creator</label>
+                        <label className="form-label">Creator</label>
                         <input
                             type="text"
                             className="input"
                             value={
-                                // Use editingItinerary name, OR current user name if creating new
-                                editingItinerary?.creator_name || editingItinerary?.creator?.full_name || currentUser?.name || ''
+                                // Priority: creator.full_name from join > creator_name from DB > current user name
+                                editingItinerary?.creator?.full_name ||
+                                editingItinerary?.creator_name ||
+                                currentUser?.name ||
+                                ''
                             }
                             readOnly
                             disabled
                         />
                     </div>
 
-                    {/* Public checkbox */}
+                    {/* Public Toggle */}
                     <div className="form-group">
-                        <label className="checkbox-label">
-                            <input
-                                type="checkbox"
-                                name="is_public"
-                                defaultChecked={editingItinerary?.is_public}
-                            />
-                            Make Public
-                        </label>
+                        <div className="flex items-center justify-between" style={{ maxWidth: '300px' }}>
+                            <div>
+                                <label className="label mb-0">Make Public</label>
+                                <p className="text-sm text-muted mt-0">
+                                    Visible to all users
+                                </p>
+                            </div>
+                            <label className="switch">
+                                <input
+                                    type="checkbox"
+                                    name="is_public"
+                                    defaultChecked={editingItinerary?.is_public}
+                                />
+                                <span className="slider round"></span>
+                            </label>
+                        </div>
                     </div>
 
                     {/* Manage Attractions - Only when editing existing itinerary */}
