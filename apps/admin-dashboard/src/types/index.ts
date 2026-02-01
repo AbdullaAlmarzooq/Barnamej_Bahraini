@@ -111,6 +111,7 @@ export interface Itinerary {
     start_date: string | null;
     end_date: string | null;
     metadata: Record<string, unknown>;
+    mode: 'flexible' | 'scheduled';
     is_active: boolean;
     creator_name: string | null;
     created_at: string;

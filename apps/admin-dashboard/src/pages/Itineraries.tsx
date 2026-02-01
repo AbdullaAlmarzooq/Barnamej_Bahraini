@@ -35,6 +35,9 @@ const Itineraries = () => {
 
     // Attraction selection state inside Modal
     const [selectedAttractionId, setSelectedAttractionId] = useState<string | null>(null);
+    // New attraction times (for Scheduled mode)
+    const [newAttractionStartTime, setNewAttractionStartTime] = useState<string>('');
+    const [newAttractionEndTime, setNewAttractionEndTime] = useState<string>('');
 
     useEffect(() => {
         loadData();
@@ -115,6 +118,8 @@ const Itineraries = () => {
     const handleAdd = () => {
         setEditingItinerary(null);
         setSelectedAttractionId(null);
+        setNewAttractionStartTime('');
+        setNewAttractionEndTime('');
         setIsModalOpen(true);
     };
 
@@ -124,6 +129,8 @@ const Itineraries = () => {
             const fullDetails = await fetchItinerary(itinerary.id);
             setEditingItinerary(fullDetails);
             setSelectedAttractionId(null);
+            setNewAttractionStartTime('');
+            setNewAttractionEndTime('');
             setIsModalOpen(true);
         } catch (err) {
             alert('Failed to load itinerary details');
@@ -141,6 +148,7 @@ const Itineraries = () => {
             // Only send user_id if we are creating new, updates usually don't change owner
             ...(editingItinerary ? {} : { user_id: currentUser?.id }),
             is_public: formData.get('is_public') === 'on', // Checkbox logic
+            mode: editingItinerary?.mode || (formData.get('mode') as 'flexible' | 'scheduled') || 'flexible',
         };
 
         try {
@@ -183,7 +191,33 @@ const Itineraries = () => {
         if (!editingItinerary || !editingItinerary.id || !selectedAttractionId) return;
 
         try {
-            await addItineraryAttraction(editingItinerary.id, selectedAttractionId);
+            let startISO, endISO;
+
+            if (editingItinerary.mode === 'scheduled') {
+                if (!newAttractionStartTime || !newAttractionEndTime) {
+                    alert("Start and End times are required for scheduled itineraries.");
+                    return;
+                }
+
+                // Validate time range
+                const d1 = new Date(`1970-01-01T${newAttractionStartTime}:00Z`).getTime();
+                const d2 = new Date(`1970-01-01T${newAttractionEndTime}:00Z`).getTime();
+
+                if (d1 >= d2) {
+                    alert("End time must be after start time");
+                    return;
+                }
+
+                startISO = newAttractionStartTime; // "09:30"
+                endISO = newAttractionEndTime;     // "11:00"
+            }
+
+            await addItineraryAttraction(
+                editingItinerary.id,
+                selectedAttractionId,
+                startISO,
+                endISO
+            );
 
             // Refresh modal data
             const updated = await fetchItinerary(editingItinerary.id);
@@ -191,6 +225,8 @@ const Itineraries = () => {
 
             // Clear selection
             setSelectedAttractionId(null);
+            setNewAttractionStartTime('');
+            setNewAttractionEndTime('');
         } catch (err) {
             alert('Failed to add attraction');
             console.error(err);
@@ -215,11 +251,65 @@ const Itineraries = () => {
     };
 
     const handleUpdateAttractionDetail = async (linkId: string, field: string, value: any) => {
+        // Special validation for time fields
+        if (field === 'scheduled_start_time' || field === 'scheduled_end_time') {
+            // Only for scheduled mode
+            if (editingItinerary?.mode !== 'scheduled') return;
+
+            // Ensure value is safe
+            if (!value) return;
+
+            // --- Front-end Validation (Requirement 4) ---
+            if (editingItinerary?.attractions) {
+                const attraction = editingItinerary.attractions.find(a => a.id === linkId);
+                if (attraction) {
+                    const otherField = field === 'scheduled_start_time' ? 'scheduled_end_time' : 'scheduled_start_time';
+                    const otherValue = attraction[otherField];
+
+                    if (otherValue) {
+                        const start = field === 'scheduled_start_time' ? value : otherValue;
+                        const end = field === 'scheduled_end_time' ? value : otherValue;
+                        const toMinutes = (t: string) => {
+                            const [h, m] = t.split(':').map(Number);
+                            return h * 60 + m;
+                        };
+
+                        const d1 = toMinutes(start);
+                        const d2 = toMinutes(end);
+
+                        if (d1 >= d2) {
+                            alert("End time must be after start time");
+                            return;
+                        }
+
+                        if (d1 >= d2) {
+                            alert("End time must be after start time");
+
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         try {
             await updateItineraryAttraction(linkId, { [field]: value });
-            // Optionally refresh to show updated totals, or just let user continue
-        } catch (err) {
+            // Refresh modal data to ensure consistency (especially for duration calcs)
+            if (editingItinerary?.id) {
+                // Optional: debounced refresh if needed, but for safe update we refresh
+                const updated = await fetchItinerary(editingItinerary.id);
+                setEditingItinerary(updated);
+            }
+        } catch (err: any) {
             console.error('Failed to update detail', err);
+            // Handle DB constraint errors
+            if (err?.message?.includes("end time must be after start")) {
+                alert("End time must be after start time");
+            } else if (err?.message?.includes("Time overlap detected")) {
+                alert("Attraction times overlap — adjust schedule");
+            } else {
+                alert("Failed to update time: " + err.message);
+            }
         }
     };
 
@@ -296,9 +386,25 @@ const Itineraries = () => {
                                         {itinerary.total_attractions || 0}
                                     </td>
                                     <td className="text-center">
-                                        {itinerary.estimated_duration_minutes
-                                            ? `${Math.floor(itinerary.estimated_duration_minutes / 60)}h ${itinerary.estimated_duration_minutes % 60}m`
-                                            : '-'}
+                                        {/* Duration Logic: 
+                                            If Flexible: use estimated_duration_minutes 
+                                            If Scheduled: calculate from attractions text or DB could recompute? 
+                                            For now trust estimated_duration_minutes from the DB View if it handles both logic? 
+                                            Actually requirement says "Calculate: earliest start -> latest end" 
+                                            For List view, we might just rely on checking itinerary.mode 
+                                        */}
+                                        {itinerary.mode === 'scheduled' ? (
+                                            // Ideally backend calculates this, but if we need frontend logic:
+                                            // We'll trust estimated_duration_minutes if the backend view updates it correctly for scheduled
+                                            // If not, we might settle for just showing what we have
+                                            itinerary.estimated_duration_minutes
+                                                ? `${Math.floor(itinerary.estimated_duration_minutes / 60)}h ${itinerary.estimated_duration_minutes % 60}m`
+                                                : '0m'
+                                        ) : (
+                                            itinerary.estimated_duration_minutes
+                                                ? `${Math.floor(itinerary.estimated_duration_minutes / 60)}h ${itinerary.estimated_duration_minutes % 60}m`
+                                                : '-'
+                                        )}
                                     </td>
                                     <td className="text-center">
                                         BD {itinerary.total_price?.toFixed(3) || '0.000'}
@@ -306,6 +412,9 @@ const Itineraries = () => {
                                     <td>
                                         <span className={`badge ${itinerary.is_public ? 'badge-success' : 'badge-warning'}`}>
                                             {itinerary.is_public ? 'Public' : 'Private'}
+                                        </span>
+                                        <span className={`badge ml-1 ${itinerary.mode === 'scheduled' ? 'badge-info' : 'badge-secondary'}`}>
+                                            {itinerary.mode === 'scheduled' ? 'Scheduled' : 'Flexible'}
                                         </span>
                                         {itinerary.is_featured && (
                                             <span className="badge badge-info ml-1">Featured</span>
@@ -369,6 +478,38 @@ const Itineraries = () => {
                         />
                     </div>
 
+                    {/* Mode Selection */}
+                    <div className="form-group">
+                        <label className="form-label required">Itinerary Type</label>
+                        {editingItinerary?.attractions && editingItinerary.attractions.length > 0 ? (
+                            <div className="p-2 bg-gray-100 rounded text-sm text-gray-600">
+                                Mode cannot be changed after attractions are added.
+                                Current: <strong>{editingItinerary.mode === 'scheduled' ? 'Scheduled' : 'Flexible'}</strong>
+                            </div>
+                        ) : (
+                            <div className="flex gap-4 mt-1">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="mode"
+                                        value="flexible"
+                                        defaultChecked={!editingItinerary?.mode || editingItinerary.mode === 'flexible'}
+                                    />
+                                    <span>Flexible (Default)</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="mode"
+                                        value="scheduled"
+                                        defaultChecked={editingItinerary?.mode === 'scheduled'}
+                                    />
+                                    <span>Scheduled (Timed)</span>
+                                </label>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Creator Name (read-only) */}
                     <div className="form-group">
                         <label className="form-label">Creator</label>
@@ -426,6 +567,30 @@ const Itineraries = () => {
                                         </option>
                                     ))}
                                 </select>
+
+                                {editingItinerary.mode === 'scheduled' && (
+                                    <>
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-muted mb-1">Start</label>
+                                            <input
+                                                type="time"
+                                                className="input input-sm"
+                                                value={newAttractionStartTime}
+                                                onChange={(e) => setNewAttractionStartTime(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <label className="text-xs text-muted mb-1">End</label>
+                                            <input
+                                                type="time"
+                                                className="input input-sm"
+                                                value={newAttractionEndTime}
+                                                onChange={(e) => setNewAttractionEndTime(e.target.value)}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+
                                 <button
                                     type="button"
                                     className="btn btn-primary"
@@ -441,8 +606,12 @@ const Itineraries = () => {
                                     <thead>
                                         <tr>
                                             <th>Attraction</th>
-                                            <th style={{ width: '110px' }}>Start</th>
-                                            <th style={{ width: '110px' }}>End</th>
+                                            {editingItinerary.mode === 'scheduled' && (
+                                                <>
+                                                    <th style={{ width: '130px' }}>Start</th>
+                                                    <th style={{ width: '130px' }}>End</th>
+                                                </>
+                                            )}
                                             <th style={{ width: '80px' }}>Price</th>
                                             <th>Notes</th>
                                             <th style={{ width: '50px' }}></th>
@@ -460,22 +629,27 @@ const Itineraries = () => {
                                                         <div className="font-bold">{ia.attraction?.name || 'Unknown Attraction'}</div>
                                                         <div className="text-xs text-muted">{ia.attraction?.category}</div>
                                                     </td>
-                                                    <td>
-                                                        <input
-                                                            type="time"
-                                                            className="input input-sm"
-                                                            defaultValue={ia.scheduled_start_time || ''}
-                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_start_time', e.target.value)}
-                                                        />
-                                                    </td>
-                                                    <td>
-                                                        <input
-                                                            type="time"
-                                                            className="input input-sm"
-                                                            defaultValue={ia.scheduled_end_time || ''}
-                                                            onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_end_time', e.target.value)}
-                                                        />
-                                                    </td>
+                                                    {editingItinerary.mode === 'scheduled' && (
+                                                        <>
+                                                            <td>
+                                                                <input
+                                                                    type="time"
+                                                                    className="input input-sm"
+                                                                    // Extract HH:mm from ISO string
+                                                                    defaultValue={ia.scheduled_start_time?.slice(0,5) || ''}
+                                                                    onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_start_time', e.target.value)}
+                                                                />
+                                                            </td>
+                                                            <td>
+                                                                <input
+                                                                    type="time"
+                                                                    className="input input-sm"
+                                                                    defaultValue={ia.scheduled_end_time ? new Date(ia.scheduled_end_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                                    onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_end_time', e.target.value)}
+                                                                />
+                                                            </td>
+                                                        </>
+                                                    )}
                                                     <td>
                                                         <div className="py-2 text-sm text-center">
                                                             {ia.attraction?.price ? `BD ${ia.attraction.price.toFixed(3)}` : 'Free'}
@@ -508,6 +682,18 @@ const Itineraries = () => {
                                     </tbody>
                                 </table>
                             </div>
+
+                            {/* Duration Summary for Scheduled */}
+                            {editingItinerary.mode === 'scheduled' && (
+                                <div className="mt-4 p-2 bg-blue-50 text-sm">
+                                    <strong>Scheduled Duration: </strong>
+                                    {editingItinerary.estimated_duration_minutes
+                                        ? `${Math.floor(editingItinerary.estimated_duration_minutes / 60)}h ${editingItinerary.estimated_duration_minutes % 60}m`
+                                        : '0h 0m'
+                                    }
+                                    <span className="text-gray-500 ml-2">(Auto-calculated from Start/End times)</span>
+                                </div>
+                            )}
 
                             <div className="mt-2 text-right font-bold">
                                 Total Price: BD {

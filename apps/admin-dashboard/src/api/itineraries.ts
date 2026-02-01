@@ -88,7 +88,9 @@ export async function deleteItinerary(id: string): Promise<{ success: boolean }>
 
 export async function addItineraryAttraction(
     itineraryId: string,
-    attractionId: string
+    attractionId: string,
+    scheduledStartTime?: string,
+    scheduledEndTime?: string
 ): Promise<{ success: boolean }> {
     // Get next position
     const { data: existing } = await supabase
@@ -109,6 +111,8 @@ export async function addItineraryAttraction(
             itinerary_id: itineraryId,
             attraction_id: attractionId,
             position: nextPosition,
+            scheduled_start_time: scheduledStartTime,
+            scheduled_end_time: scheduledEndTime
         })
 
     if (error) throw new Error(error.message)
