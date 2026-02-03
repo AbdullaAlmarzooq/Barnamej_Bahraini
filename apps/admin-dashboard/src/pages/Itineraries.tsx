@@ -38,11 +38,40 @@ const Itineraries = () => {
     // New attraction times (for Scheduled mode)
     const [newAttractionStartTime, setNewAttractionStartTime] = useState<string>('');
     const [newAttractionEndTime, setNewAttractionEndTime] = useState<string>('');
+    const [attractionTimes, setAttractionTimes] = useState<Record<string, { start: string; end: string }>>({});
+
+    const toTimeInputValue = (value?: string | null) => {
+        if (!value) return '';
+        const match = value.match(/(\d{2}):(\d{2})/);
+        if (match) {
+            return `${match[1]}:${match[2]}`;
+        }
+        if (value.includes('T')) {
+            return value.slice(11, 16);
+        }
+        return value.slice(0, 5);
+    };
 
     useEffect(() => {
         loadData();
         getUser();
     }, []);
+
+    useEffect(() => {
+        if (!editingItinerary?.attractions) {
+            setAttractionTimes({});
+            return;
+        }
+
+        const nextTimes: Record<string, { start: string; end: string }> = {};
+        editingItinerary.attractions.forEach((ia) => {
+            nextTimes[ia.id] = {
+                start: toTimeInputValue(ia.scheduled_start_time),
+                end: toTimeInputValue(ia.scheduled_end_time),
+            };
+        });
+        setAttractionTimes(nextTimes);
+    }, [editingItinerary?.id, editingItinerary?.attractions]);
 
     const getUser = async () => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -259,6 +288,8 @@ const Itineraries = () => {
             // Ensure value is safe
             if (!value) return;
 
+            const normalizedValue = toTimeInputValue(value);
+
             // --- Front-end Validation (Requirement 4) ---
             if (editingItinerary?.attractions) {
                 const attraction = editingItinerary.attractions.find(a => a.id === linkId);
@@ -267,8 +298,8 @@ const Itineraries = () => {
                     const otherValue = attraction[otherField];
 
                     if (otherValue) {
-                        const start = field === 'scheduled_start_time' ? value : otherValue;
-                        const end = field === 'scheduled_end_time' ? value : otherValue;
+                        const start = field === 'scheduled_start_time' ? normalizedValue : toTimeInputValue(otherValue as string);
+                        const end = field === 'scheduled_end_time' ? normalizedValue : toTimeInputValue(otherValue as string);
                         const toMinutes = (t: string) => {
                             const [h, m] = t.split(':').map(Number);
                             return h * 60 + m;
@@ -293,7 +324,10 @@ const Itineraries = () => {
         }
 
         try {
-            await updateItineraryAttraction(linkId, { [field]: value });
+            const nextValue = (field === 'scheduled_start_time' || field === 'scheduled_end_time')
+                ? toTimeInputValue(value)
+                : value;
+            await updateItineraryAttraction(linkId, { [field]: nextValue });
             // Refresh modal data to ensure consistency (especially for duration calcs)
             if (editingItinerary?.id) {
                 // Optional: debounced refresh if needed, but for safe update we refresh
@@ -636,7 +670,16 @@ const Itineraries = () => {
                                                                     type="time"
                                                                     className="input input-sm"
                                                                     // Extract HH:mm from ISO string
-                                                                    defaultValue={ia.scheduled_start_time?.slice(0,5) || ''}
+                                                                    value={attractionTimes[ia.id]?.start || ''}
+                                                                    onChange={(e) =>
+                                                                        setAttractionTimes((prev) => ({
+                                                                            ...prev,
+                                                                            [ia.id]: {
+                                                                                start: e.target.value,
+                                                                                end: prev[ia.id]?.end || '',
+                                                                            },
+                                                                        }))
+                                                                    }
                                                                     onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_start_time', e.target.value)}
                                                                 />
                                                             </td>
@@ -644,7 +687,16 @@ const Itineraries = () => {
                                                                 <input
                                                                     type="time"
                                                                     className="input input-sm"
-                                                                    defaultValue={ia.scheduled_end_time ? new Date(ia.scheduled_end_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                                    value={attractionTimes[ia.id]?.end || ''}
+                                                                    onChange={(e) =>
+                                                                        setAttractionTimes((prev) => ({
+                                                                            ...prev,
+                                                                            [ia.id]: {
+                                                                                start: prev[ia.id]?.start || '',
+                                                                                end: e.target.value,
+                                                                            },
+                                                                        }))
+                                                                    }
                                                                     onBlur={(e) => handleUpdateAttractionDetail(ia.id, 'scheduled_end_time', e.target.value)}
                                                                 />
                                                             </td>
