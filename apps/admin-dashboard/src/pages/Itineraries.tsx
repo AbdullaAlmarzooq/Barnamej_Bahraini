@@ -463,18 +463,22 @@ const Itineraries = () => {
                                             >
                                                 View
                                             </Link>
-                                            <button
-                                                className="btn btn-sm btn-secondary"
-                                                onClick={() => handleEdit(itinerary)}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                className="btn btn-sm btn-danger"
-                                                onClick={() => handleDelete(itinerary.id)}
-                                            >
-                                                Delete
-                                            </button>
+                                            {itinerary.is_public && (
+                                                <>
+                                                    <button
+                                                        className="btn btn-sm btn-secondary"
+                                                        onClick={() => handleEdit(itinerary)}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-sm btn-danger"
+                                                        onClick={() => handleDelete(itinerary.id)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

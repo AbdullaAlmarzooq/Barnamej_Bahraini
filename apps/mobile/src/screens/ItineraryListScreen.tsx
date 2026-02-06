@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getItineraries, createItinerary, addAttractionToItinerary } from '@barnamej/supabase-client';
+import { getItineraries, getUserItineraries, createItinerary, addAttractionToItinerary, supabase } from '@barnamej/supabase-client';
+import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
 
 const ItineraryListScreen = () => {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'my' | 'community'>('my');
     const [itineraries, setItineraries] = useState<any[]>([]);
     const [isModalVisible, setIsModalVisible] = useState(false);
@@ -19,6 +21,13 @@ const ItineraryListScreen = () => {
     // Check if we are in "Add to Itinerary" mode
     const addToItineraryId = route.params?.addToItineraryId;
 
+    const formatDuration = (minutes?: number | null) => {
+        if (!minutes) return '-';
+        const hrs = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hrs > 0 ? `${hrs}h ` : ''}${mins}m`;
+    };
+
     useFocusEffect(
         useCallback(() => {
             loadItineraries();
@@ -27,7 +36,14 @@ const ItineraryListScreen = () => {
 
     const loadItineraries = async () => {
         try {
-            const { data, error } = await getItineraries(activeTab === 'my' ? 'private' : 'public');
+            if (activeTab === 'my' && !user) {
+                setItineraries([]);
+                return;
+            }
+
+            const { data, error } = activeTab === 'my'
+                ? await getUserItineraries(user!.id)
+                : await getItineraries('public');
             if (error) throw error;
 
             const list = (data || []).map((it: any) => ({
@@ -48,12 +64,18 @@ const ItineraryListScreen = () => {
             return;
         }
 
+        if (!user) {
+            Alert.alert('Login required', 'Please log in to create an itinerary.');
+            return;
+        }
+
         try {
             const { error } = await createItinerary({
                 name: newItineraryName,
                 description: newItineraryDesc || null,
                 is_public: isPublic,
                 creator_name: 'Me',
+                user_id: user.id,
             });
             if (error) throw error;
             setNewItineraryName('');
@@ -71,26 +93,47 @@ const ItineraryListScreen = () => {
         console.log('handleItineraryPress called for itinerary:', itinerary.id, itinerary.name);
         console.log('addToItineraryId:', addToItineraryId);
 
-        if (addToItineraryId) {
-            // Add attraction to this itinerary
-            console.log('IN ADD MODE: Adding attraction', addToItineraryId, 'to itinerary', itinerary.id);
-            try {
-                const { error } = await addAttractionToItinerary({
-                    itinerary_id: String(itinerary.id),
-                    attraction_id: String(addToItineraryId),
-                });
-                if (error) throw error;
-                Alert.alert('Success', 'Attraction added to itinerary!', [
-                    { text: 'OK', onPress: () => navigation.goBack() }
-                ]);
-            } catch (error) {
-                Alert.alert('Error', 'Failed to add to itinerary.');
-                console.error(error);
+        // Navigate to details
+        console.log('NAVIGATING to ItineraryDetails with itineraryId:', itinerary.id);
+        navigation.navigate('ItineraryDetails', { itineraryId: itinerary.id });
+    };
+
+    const handleAddToItinerary = async (itinerary: any) => {
+        if (!addToItineraryId) return;
+        console.log('IN ADD MODE: Adding attraction', addToItineraryId, 'to itinerary', itinerary.id);
+        try {
+            const { data: existing, error: existingError } = await supabase
+                .from('itinerary_attractions')
+                .select('id')
+                .eq('itinerary_id', String(itinerary.id))
+                .eq('attraction_id', String(addToItineraryId))
+                .is('deleted_at', null)
+                .limit(1);
+
+            if (existingError) throw existingError;
+
+            if (existing && existing.length > 0) {
+                Alert.alert('Already added', 'This attraction is already in the itinerary.');
+                return;
             }
-        } else {
-            // Navigate to details
-            console.log('NAVIGATING to ItineraryDetails with itineraryId:', itinerary.id);
-            navigation.navigate('ItineraryDetails', { itineraryId: itinerary.id });
+
+            const { error } = await addAttractionToItinerary({
+                itinerary_id: String(itinerary.id),
+                attraction_id: String(addToItineraryId),
+            });
+            if (error) throw error;
+            Alert.alert('Success', 'Attraction added to itinerary!', [
+                {
+                    text: 'OK',
+                    onPress: () => {
+                        navigation.setParams({ addToItineraryId: undefined });
+                        navigation.goBack();
+                    }
+                }
+            ]);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to add to itinerary.');
+            console.error(error);
         }
     };
 
@@ -135,13 +178,24 @@ const ItineraryListScreen = () => {
                                 <View style={styles.metaRow}>
                                     <Text style={styles.itineraryCount}>{item.count} stops</Text>
                                     <Text style={styles.separator}>•</Text>
+                                    <Text style={styles.durationText}>{formatDuration(item.estimated_duration_minutes)}</Text>
+                                    <Text style={styles.separator}>•</Text>
                                     <Text style={styles.price}>{item.total_price ? `${item.total_price} BHD` : 'Free'}</Text>
                                 </View>
                                 {activeTab === 'community' && (
                                     <Text style={styles.creator}>By {item.creator_name || 'Unknown'}</Text>
                                 )}
                             </View>
-                            <Ionicons name="chevron-forward" size={24} color="#ccc" />
+                            {addToItineraryId ? (
+                                <TouchableOpacity
+                                    style={styles.addButton}
+                                    onPress={() => handleAddToItinerary(item)}
+                                >
+                                    <Text style={styles.addButtonText}>Add</Text>
+                                </TouchableOpacity>
+                            ) : (
+                                <Ionicons name="chevron-forward" size={24} color="#ccc" />
+                            )}
                         </View>
                     </TouchableOpacity>
                 )}
@@ -149,7 +203,9 @@ const ItineraryListScreen = () => {
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
                         <Text style={styles.emptyText}>
-                            {activeTab === 'my' ? "You haven't created any itineraries yet." : "No community itineraries found."}
+                            {activeTab === 'my'
+                                ? (user ? "You haven't created any itineraries yet." : 'Log in to see your private itineraries.')
+                                : "No community itineraries found."}
                         </Text>
                     </View>
                 }
@@ -299,6 +355,10 @@ const styles = StyleSheet.create({
         marginHorizontal: 8,
         color: '#ccc',
     },
+    durationText: {
+        fontSize: 14,
+        color: '#666',
+    },
     price: {
         fontSize: 14,
         fontWeight: '600',
@@ -317,6 +377,17 @@ const styles = StyleSheet.create({
     emptyText: {
         fontSize: 16,
         color: '#666',
+    },
+    addButton: {
+        backgroundColor: '#D71A28',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
+    },
+    addButtonText: {
+        color: '#fff',
+        fontSize: 12,
+        fontWeight: '700',
     },
     fab: {
         position: 'absolute',

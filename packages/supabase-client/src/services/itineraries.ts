@@ -88,7 +88,7 @@ export async function getItineraryWithAttractions(id: string) {
       *,
       attractions:itinerary_attractions(
         *,
-        attraction:attractions(*)
+        attraction:attractions_with_photo(*)
       )
     `)
         .eq('id', id)
@@ -223,20 +223,37 @@ export async function reorderItineraryAttractions(itineraryId: string, orderedId
     // Check if itinerary is public (reordering disabled for public)
     const { data: itinerary } = await getItinerary(itineraryId);
 
+    const mode = (itinerary as any)?.mode ?? (itinerary as any)?.itinerary_mode;
+    const isAuto = mode === 'auto';
+
     if (itinerary?.is_public) {
         return { success: false, error: new Error('Cannot reorder a public itinerary') };
     }
-
-    // Update positions
-    const updates = orderedIds.map((id, index) =>
-        supabase
-            .from('itinerary_attractions')
-            .update({ position: index })
-            .eq('id', id)
-    );
+    if (isAuto) {
+        return { success: false, error: new Error('Cannot reorder an auto itinerary') };
+    }
 
     try {
-        await Promise.all(updates);
+        // Phase 1: move to temporary positions to avoid unique constraint conflicts
+        for (let i = 0; i < orderedIds.length; i += 1) {
+            const id = orderedIds[i];
+            const { error } = await supabase
+                .from('itinerary_attractions')
+                .update({ position: i + 10000 })
+                .eq('id', id);
+            if (error) throw error;
+        }
+
+        // Phase 2: set final positions
+        for (let i = 0; i < orderedIds.length; i += 1) {
+            const id = orderedIds[i];
+            const { error } = await supabase
+                .from('itinerary_attractions')
+                .update({ position: i })
+                .eq('id', id);
+            if (error) throw error;
+        }
+
         return { success: true, error: null };
     } catch (error) {
         return { success: false, error };

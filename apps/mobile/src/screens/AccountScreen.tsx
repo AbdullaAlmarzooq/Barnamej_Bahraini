@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -14,10 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { supabase } from '@barnamej/supabase-client';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 type Mode = 'signup' | 'login';
 
 const AccountScreen = () => {
+    const { user, signOut } = useAuth();
     const [mode, setMode] = useState<Mode>('signup');
 
     const [fullName, setFullName] = useState('');
@@ -28,6 +30,32 @@ const AccountScreen = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [loadingProfile, setLoadingProfile] = useState(false);
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            if (!user) return;
+            setLoadingProfile(true);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name, birthdate, email')
+                .eq('id', user.id)
+                .single();
+
+            if (error) {
+                console.error('[Profile] load error:', error);
+                setLoadingProfile(false);
+                return;
+            }
+
+            setFullName(data?.full_name || '');
+            setEmail(data?.email || user.email || '');
+            setBirthdate(data?.birthdate ? new Date(data.birthdate) : null);
+            setLoadingProfile(false);
+        };
+
+        loadProfile();
+    }, [user]);
 
     const formatDate = (date: Date | null) => {
         if (!date) return '';
@@ -157,21 +185,74 @@ const AccountScreen = () => {
         }
     };
 
+    const handleUpdateProfile = async () => {
+        setError(null);
+
+        if (!user) return;
+        if (!fullName.trim() || !birthdate) {
+            setError('Please fill in all fields.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const birthdateValue = formatDate(birthdate);
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .update({
+                    full_name: fullName.trim(),
+                    birthdate: birthdateValue,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', user.id);
+
+            if (profileError) throw profileError;
+
+            Alert.alert('Updated', 'Your profile has been updated.');
+        } catch (err: any) {
+            setError(err?.message || 'Update failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleChangePassword = async () => {
+        setError(null);
+
+        if (!password.trim()) {
+            setError('Please enter a new password.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: password,
+            });
+
+            if (updateError) throw updateError;
+
+            Alert.alert('Password Updated', 'Your password has been changed.');
+            setPassword('');
+            setShowPassword(false);
+        } catch (err: any) {
+            setError(err?.message || 'Password update failed.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-                <View style={styles.header}>
-                    <Text style={styles.title}>{mode === 'signup' ? 'Create Account' : 'Welcome Back'}</Text>
-                    <Text style={styles.subtitle}>
-                        {mode === 'signup'
-                            ? 'Join Barnamej Bahraini in a few steps.'
-                            : 'Log in to access your saved plans.'}
-                    </Text>
-                </View>
+                {user ? (
+                    <>
+                        <View style={styles.header}>
+                            <Text style={styles.title}>My Account</Text>
+                            <Text style={styles.subtitle}>Manage your profile and password.</Text>
+                        </View>
 
-                <View style={styles.form}>
-                    {mode === 'signup' && (
-                        <>
+                        <View style={styles.form}>
                             <Text style={styles.label}>Full Name</Text>
                             <TextInput
                                 style={styles.input}
@@ -180,21 +261,14 @@ const AccountScreen = () => {
                                 onChangeText={setFullName}
                                 autoCapitalize="words"
                             />
-                        </>
-                    )}
 
-                    <Text style={styles.label}>Email</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="you@example.com"
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                    />
+                            <Text style={styles.label}>Email</Text>
+                            <TextInput
+                                style={[styles.input, styles.disabledInput]}
+                                value={email}
+                                editable={false}
+                            />
 
-                    {mode === 'signup' && (
-                        <>
                             <Text style={styles.label}>Birthdate</Text>
                             <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
                                 <View pointerEvents="none">
@@ -222,60 +296,174 @@ const AccountScreen = () => {
                                     )}
                                 </View>
                             )}
-                        </>
-                    )}
 
-                    <Text style={styles.label}>Password</Text>
-                    <View style={styles.passwordRow}>
-                        <TextInput
-                            style={[styles.input, styles.passwordInput]}
-                            placeholder={mode === 'signup' ? 'Create a password' : 'Your password'}
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry={!showPassword}
-                            autoCapitalize="none"
-                        />
-                        <TouchableOpacity
-                            style={styles.passwordToggle}
-                            onPress={() => setShowPassword((prev) => !prev)}
-                            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                            <Ionicons
-                                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                                size={20}
-                                color="#666"
+                            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                            <TouchableOpacity style={styles.button} onPress={handleUpdateProfile} disabled={loading || loadingProfile}>
+                                {loading || loadingProfile ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.buttonText}>Save Changes</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <View style={styles.divider} />
+
+                            <Text style={styles.sectionTitle}>Change Password</Text>
+                            <View style={styles.passwordRow}>
+                                <TextInput
+                                    style={[styles.input, styles.passwordInput]}
+                                    placeholder="New password"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                />
+                                <TouchableOpacity
+                                    style={styles.passwordToggle}
+                                    onPress={() => setShowPassword((prev) => !prev)}
+                                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    <Ionicons
+                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                        size={20}
+                                        color="#666"
+                                    />
+                                </TouchableOpacity>
+                            </View>
+                            <TouchableOpacity style={styles.button} onPress={handleChangePassword} disabled={loading}>
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.buttonText}>Update Password</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
+                                <Text style={styles.logoutText}>Log Out</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                ) : (
+                    <>
+                        <View style={styles.header}>
+                            <Text style={styles.title}>{mode === 'signup' ? 'Create Account' : 'Welcome Back'}</Text>
+                            <Text style={styles.subtitle}>
+                                {mode === 'signup'
+                                    ? 'Join Barnamej Bahraini in a few steps.'
+                                    : 'Log in to access your saved plans.'}
+                            </Text>
+                        </View>
+
+                        <View style={styles.form}>
+                            {mode === 'signup' && (
+                                <>
+                                    <Text style={styles.label}>Full Name</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Your full name"
+                                        value={fullName}
+                                        onChangeText={setFullName}
+                                        autoCapitalize="words"
+                                    />
+                                </>
+                            )}
+
+                            <Text style={styles.label}>Email</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="you@example.com"
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
                             />
-                        </TouchableOpacity>
-                    </View>
 
-                    {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                            {mode === 'signup' && (
+                                <>
+                                    <Text style={styles.label}>Birthdate</Text>
+                                    <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
+                                        <View pointerEvents="none">
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder="Select date"
+                                                value={formatDate(birthdate)}
+                                                editable={false}
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+                                    {showDatePicker && (
+                                        <View style={styles.datePicker}>
+                                            <DateTimePicker
+                                                value={birthdate || new Date(2000, 0, 1)}
+                                                mode="date"
+                                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                onChange={onDateChange}
+                                                maximumDate={new Date()}
+                                            />
+                                            {Platform.OS === 'ios' && (
+                                                <TouchableOpacity style={styles.dateDone} onPress={() => setShowDatePicker(false)}>
+                                                    <Text style={styles.dateDoneText}>Done</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    )}
+                                </>
+                            )}
 
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={mode === 'signup' ? handleSignUp : handleLogin}
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Text style={styles.buttonText}>{mode === 'signup' ? 'Sign Up' : 'Log In'}</Text>
-                        )}
-                    </TouchableOpacity>
+                            <Text style={styles.label}>Password</Text>
+                            <View style={styles.passwordRow}>
+                                <TextInput
+                                    style={[styles.input, styles.passwordInput]}
+                                    placeholder={mode === 'signup' ? 'Create a password' : 'Your password'}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry={!showPassword}
+                                    autoCapitalize="none"
+                                />
+                                <TouchableOpacity
+                                    style={styles.passwordToggle}
+                                    onPress={() => setShowPassword((prev) => !prev)}
+                                    accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                    <Ionicons
+                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                                        size={20}
+                                        color="#666"
+                                    />
+                                </TouchableOpacity>
+                            </View>
 
-                    <TouchableOpacity
-                        style={styles.switchRow}
-                        onPress={() => {
-                            setMode(mode === 'signup' ? 'login' : 'signup');
-                            setError(null);
-                        }}
-                    >
-                        <Text style={styles.switchText}>
-                            {mode === 'signup'
-                                ? 'Already have an account? Log in'
-                                : "Don't have an account? Sign up"}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+                            <TouchableOpacity
+                                style={styles.button}
+                                onPress={mode === 'signup' ? handleSignUp : handleLogin}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <Text style={styles.buttonText}>{mode === 'signup' ? 'Sign Up' : 'Log In'}</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={styles.switchRow}
+                                onPress={() => {
+                                    setMode(mode === 'signup' ? 'login' : 'signup');
+                                    setError(null);
+                                }}
+                            >
+                                <Text style={styles.switchText}>
+                                    {mode === 'signup'
+                                        ? 'Already have an account? Log in'
+                                        : "Don't have an account? Sign up"}
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -326,6 +514,9 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         fontSize: 15,
         color: '#111',
+    },
+    disabledInput: {
+        color: '#888',
     },
     passwordRow: {
         position: 'relative',
@@ -386,6 +577,30 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: '600',
         fontSize: 13,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#eee',
+        marginVertical: 20,
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#333',
+        marginBottom: 10,
+    },
+    logoutButton: {
+        marginTop: 16,
+        paddingVertical: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#D71A28',
+        alignItems: 'center',
+    },
+    logoutText: {
+        color: '#D71A28',
+        fontWeight: '700',
+        fontSize: 14,
     },
 });
 

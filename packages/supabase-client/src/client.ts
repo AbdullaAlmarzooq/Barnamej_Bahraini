@@ -3,7 +3,7 @@
  * This is the core client used by all services
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient, SupabaseClientOptions } from '@supabase/supabase-js'
 
 // Client singleton
 let supabaseInstance: SupabaseClient | null = null
@@ -37,13 +37,22 @@ function getSupabaseConfig(): { url: string; anonKey: string } {
  * Initialize the Supabase client with custom config
  * Called by entry points to ensure proper environment variables
  */
-export function initSupabase(url: string, anonKey: string): SupabaseClient {
+export function initSupabase(
+    url: string,
+    anonKey: string,
+    options?: SupabaseClientOptions<'public'>
+): SupabaseClient {
+    const auth = {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        ...(options?.auth || {}),
+    }
+
+    const { auth: _auth, ...rest } = options || {}
     supabaseInstance = createClient(url, anonKey, {
-        auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true
-        }
+        ...rest,
+        auth,
     })
     return supabaseInstance
 }

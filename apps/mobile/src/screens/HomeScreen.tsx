@@ -1,17 +1,20 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getFeaturedAttractions, getItineraries } from '@barnamej/supabase-client';
+import { getFeaturedAttractions, getUserItineraries, supabase } from '@barnamej/supabase-client';
 import { getFirstPhoto } from '../utils/attractionPhotos';
 import { getPublicImageUrl } from '../utils/supabaseStorage';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.7;
 
 const HomeScreen = () => {
     const navigation = useNavigation<any>();
+    const { user } = useAuth();
+    const [profileName, setProfileName] = useState<string | null>(null);
     const [featuredAttractions, setFeaturedAttractions] = useState<any[]>([]);
     const [recentItineraries, setRecentItineraries] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -22,12 +25,36 @@ const HomeScreen = () => {
         }, [])
     );
 
+    useEffect(() => {
+        const loadProfile = async () => {
+            if (!user) {
+                setProfileName(null);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', user.id)
+                .single();
+
+            if (error) {
+                console.error('[Profile] load error:', error);
+                return;
+            }
+
+            setProfileName(data?.full_name ?? null);
+        };
+
+        loadProfile();
+    }, [user]);
+
     const loadData = async () => {
         try {
             setLoading(true);
             const [attractionsResult, itinerariesResult] = await Promise.all([
                 getFeaturedAttractions(),
-                getItineraries('private')
+                user ? getUserItineraries(user.id) : Promise.resolve({ data: [], error: null })
             ]);
             if (attractionsResult.error) throw attractionsResult.error;
             if (itinerariesResult.error) throw itinerariesResult.error;
@@ -58,13 +85,17 @@ const HomeScreen = () => {
         return 'Good Evening';
     };
 
+    const displayName = profileName || user?.email || '';
+
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
             <ScrollView showsVerticalScrollIndicator={false}>
                 {/* Header */}
                 <View style={styles.header}>
                     <View>
-                        <Text style={styles.greeting}>{getGreeting()} 👋</Text>
+                        <Text style={styles.greeting}>
+                            {getGreeting()}{displayName ? `, ${displayName}` : ''} 👋
+                        </Text>
                         <Text style={styles.headerTitle}>Explore Bahrain</Text>
                     </View>
                     <View style={styles.logoContainer}>

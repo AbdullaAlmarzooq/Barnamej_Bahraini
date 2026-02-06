@@ -9,20 +9,29 @@ import {
     deleteItinerary,
     updateItineraryAttraction,
     toggleAutoSort,
-    reorderItineraryAttractions
+    reorderItineraryAttractions,
+    updateItinerary
 } from '@barnamej/supabase-client';
 import { getFirstPhoto } from '../utils/attractionPhotos';
 import Button from '../components/Button';
+import { useAuth } from '../context/AuthContext';
+import { getPublicImageUrl } from '../utils/supabaseStorage';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const ItineraryDetailsScreen = () => {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const { itineraryId } = route.params;
+    const { user } = useAuth();
 
     const [itinerary, setItinerary] = useState<any>(null);
     const [editingItem, setEditingItem] = useState<any>(null);
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
+    const [startTimeValue, setStartTimeValue] = useState<Date | null>(null);
+    const [endTimeValue, setEndTimeValue] = useState<Date | null>(null);
+    const [showStartPicker, setShowStartPicker] = useState(false);
+    const [showEndPicker, setShowEndPicker] = useState(false);
     const [price, setPrice] = useState('');
     const [notes, setNotes] = useState('');
     const [isLoading, setIsLoading] = useState(true);
@@ -33,11 +42,8 @@ const ItineraryDetailsScreen = () => {
         }, [itineraryId])
     );
 
-    const normalizeItinerary = (data: any) => ({
-        ...data,
-        is_public: Boolean(data.is_public),
-        auto_sort_enabled: Boolean(data.auto_sort_enabled),
-        attractions: (data.attractions || []).map((item: any) => {
+    const normalizeItinerary = (data: any) => {
+        const normalizedAttractions = (data.attractions || []).map((item: any) => {
             const attractionId = item.attraction?.id;
             const numericId = typeof attractionId === 'number' ? attractionId : Number(attractionId);
             const categoryRaw = (item.attraction?.category || '').toString().replace(/_/g, ' ');
@@ -50,9 +56,32 @@ const ItineraryDetailsScreen = () => {
                 id: Number.isNaN(numericId) ? attractionId : numericId,
                 name: item.attraction?.name,
                 category: categoryRaw.replace(/\b\w/g, (char: string) => char.toUpperCase()),
+                estimated_duration_minutes: item.attraction?.estimated_duration_minutes ?? 0,
+                primary_photo_bucket: item.attraction?.primary_photo_bucket,
+                primary_photo_path: item.attraction?.primary_photo_path,
             };
-        }),
-    });
+        });
+
+        const mode = data.mode ?? data.itinerary_mode;
+        const sortedAttractions = mode === 'scheduled'
+            ? normalizedAttractions.sort((a: any, b: any) => {
+                const aTime = parseTimeToDate(a.start_time)?.getTime() ?? 0;
+                const bTime = parseTimeToDate(b.start_time)?.getTime() ?? 0;
+                return aTime - bTime;
+            })
+            : normalizedAttractions;
+
+        return {
+            ...data,
+            is_public: Boolean(data.is_public),
+            auto_sort_enabled: Boolean(data.auto_sort_enabled),
+            mode,
+            attractions: sortedAttractions,
+        };
+    };
+
+    const isOwner = itinerary?.user_id && user?.id === itinerary.user_id;
+    const canEdit = isOwner && !itinerary?.is_public;
 
     const loadData = async () => {
         setIsLoading(true);
@@ -121,10 +150,108 @@ const ItineraryDetailsScreen = () => {
         );
     };
 
+    const parseTimeToDate = (value: string | null | undefined): Date | null => {
+        if (!value) return null;
+        const now = new Date();
+        const trimmed = value.trim();
+        const hmsMatch = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+        if (hmsMatch) {
+            const hours = parseInt(hmsMatch[1], 10);
+            const minutes = parseInt(hmsMatch[2], 10);
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        }
+        const normalized = trimmed.includes(' ') && !trimmed.includes('T')
+            ? trimmed.replace(' ', 'T')
+            : trimmed;
+        const iso = Date.parse(normalized);
+        if (!Number.isNaN(iso)) {
+            const d = new Date(iso);
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), d.getHours(), d.getMinutes(), 0, 0);
+        }
+        const ampmMatch = trimmed.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+        if (ampmMatch) {
+            let hours = parseInt(ampmMatch[1], 10);
+            const minutes = parseInt(ampmMatch[2], 10);
+            const period = ampmMatch[3].toUpperCase();
+            if (period === 'PM' && hours < 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        }
+        const hmMatch = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+        if (hmMatch) {
+            const hours = parseInt(hmMatch[1], 10);
+            const minutes = parseInt(hmMatch[2], 10);
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+        }
+        return null;
+    };
+
+    const formatTime = (date: Date | null) => {
+        if (!date) return '';
+        const hours = date.getHours();
+        const minutes = `${date.getMinutes()}`.padStart(2, '0');
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+        return `${displayHours}:${minutes} ${period}`;
+    };
+
+    const getScheduledDuration = () => {
+        if (!itinerary?.attractions || itinerary.attractions.length === 0) return null;
+        const times = itinerary.attractions
+            .map((item: any) => ({
+                start: parseTimeToDate(item.start_time),
+                end: parseTimeToDate(item.end_time),
+            }))
+            .filter((t: any) => t.start && t.end);
+
+        if (times.length === 0) return null;
+
+        const earliest = times.reduce((min: Date, t: any) => (t.start < min ? t.start : min), times[0].start);
+        const latest = times.reduce((max: Date, t: any) => (t.end > max ? t.end : max), times[0].end);
+        const diffMs = latest.getTime() - earliest.getTime();
+        if (diffMs <= 0) return null;
+        const minutes = Math.round(diffMs / 60000);
+        const hours = Math.floor(minutes / 60);
+        const rem = minutes % 60;
+        return `${hours > 0 ? `${hours}h ` : ''}${rem}m`;
+    };
+
+    const getFlexibleDuration = () => {
+        if (!itinerary?.attractions || itinerary.attractions.length === 0) return null;
+        const totalMinutes = itinerary.attractions.reduce((sum: number, item: any) => {
+            const minutes = item.estimated_duration_minutes ?? 0;
+            return sum + minutes;
+        }, 0);
+        if (!totalMinutes) return null;
+        const hours = Math.floor(totalMinutes / 60);
+        const rem = totalMinutes % 60;
+        return `${hours > 0 ? `${hours}h ` : ''}${rem}m`;
+    };
+
+    const onStartTimeChange = (_event: DateTimePickerEvent, selected?: Date) => {
+        setShowStartPicker(false);
+        if (selected) {
+            setStartTimeValue(selected);
+            setStartTime(formatTime(selected));
+        }
+    };
+
+    const onEndTimeChange = (_event: DateTimePickerEvent, selected?: Date) => {
+        setShowEndPicker(false);
+        if (selected) {
+            setEndTimeValue(selected);
+            setEndTime(formatTime(selected));
+        }
+    };
+
     const openEditModal = (item: any) => {
         setEditingItem(item);
-        setStartTime(item.start_time || '');
-        setEndTime(item.end_time || '');
+        const startDate = parseTimeToDate(item.start_time);
+        const endDate = parseTimeToDate(item.end_time);
+        setStartTimeValue(startDate);
+        setEndTimeValue(endDate);
+        setStartTime(startDate ? formatTime(startDate) : '');
+        setEndTime(endDate ? formatTime(endDate) : '');
         setPrice(item.price ? item.price.toString() : '');
         setNotes(item.notes || '');
     };
@@ -147,11 +274,30 @@ const ItineraryDetailsScreen = () => {
     };
 
     const handleToggleAutoSort = async (value: boolean) => {
+        if (value) {
+            const missingTimes = itinerary?.attractions?.some(
+                (item: any) => !item.start_time || !item.end_time
+            );
+            if (missingTimes) {
+                Alert.alert(
+                    'Missing Times',
+                    'Please enter start and end times for all attractions before enabling auto-sort.'
+                );
+                return;
+            }
+        }
+
         try {
             // Optimistic update
             setItinerary((prev: any) => ({ ...prev, auto_sort_enabled: value }));
             const { error } = await toggleAutoSort(String(itineraryId), value);
             if (error) throw error;
+
+            if (value) {
+                const { error: modeError } = await updateItinerary(String(itineraryId), { mode: 'scheduled' });
+                if (modeError) throw modeError;
+            }
+
             loadData(); // Reload to get sorted list if enabled
         } catch (error) {
             Alert.alert('Error', 'Failed to toggle auto-sort.');
@@ -199,15 +345,19 @@ const ItineraryDetailsScreen = () => {
         <SafeAreaView style={styles.container} edges={['top']}>
             {/* Fixed Header */}
             <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#333" />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle} numberOfLines={1}>{itinerary.name}</Text>
-                    <TouchableOpacity onPress={handleDeleteItinerary}>
-                        <Ionicons name="trash-outline" size={22} color="#D71A28" />
-                    </TouchableOpacity>
-                </View>
+                    <View style={styles.headerTop}>
+                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                            <Ionicons name="arrow-back" size={24} color="#333" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle} numberOfLines={1}>{itinerary.name}</Text>
+                        {canEdit ? (
+                            <TouchableOpacity onPress={handleDeleteItinerary}>
+                                <Ionicons name="trash-outline" size={22} color="#D71A28" />
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.headerSpacer} />
+                        )}
+                    </View>
 
                 {/* Summary Row */}
                 <View style={styles.summaryRow}>
@@ -219,6 +369,17 @@ const ItineraryDetailsScreen = () => {
                         <Ionicons name="location-outline" size={16} color="#666" />
                         <Text style={styles.summaryText}>{itinerary.attractions?.length || 0} stops</Text>
                     </View>
+                    {itinerary.mode === 'scheduled' ? (
+                        <View style={styles.summaryItem}>
+                            <Ionicons name="time-outline" size={16} color="#666" />
+                            <Text style={styles.summaryText}>{getScheduledDuration() || '-'}</Text>
+                        </View>
+                    ) : (
+                        <View style={styles.summaryItem}>
+                            <Ionicons name="time-outline" size={16} color="#666" />
+                            <Text style={styles.summaryText}>{getFlexibleDuration() || '-'}</Text>
+                        </View>
+                    )}
                     <View style={styles.summaryItem}>
                         <Ionicons name="cash-outline" size={16} color="#D71A28" />
                         <Text style={[styles.summaryText, styles.priceText]}>
@@ -228,17 +389,18 @@ const ItineraryDetailsScreen = () => {
                 </View>
 
                 {/* Auto-Sort Toggle */}
-                <View style={styles.toggleRow}>
-                    <Text style={styles.toggleLabel}>Auto-sort attractions by time</Text>
-                    <Switch
-                        trackColor={{ false: "#767577", true: "#D71A28" }}
-                        thumbColor={itinerary.auto_sort_enabled ? "#fff" : "#f4f3f4"}
-                        ios_backgroundColor="#3e3e3e"
-                        onValueChange={handleToggleAutoSort}
-                        value={itinerary.auto_sort_enabled === true}
-                        disabled={itinerary.is_public === true}
-                    />
-                </View>
+                {canEdit && (
+                    <View style={styles.toggleRow}>
+                        <Text style={styles.toggleLabel}>Auto-sort attractions by time</Text>
+                        <Switch
+                            trackColor={{ false: "#767577", true: "#D71A28" }}
+                            thumbColor={itinerary.auto_sort_enabled ? "#fff" : "#f4f3f4"}
+                            ios_backgroundColor="#3e3e3e"
+                            onValueChange={handleToggleAutoSort}
+                            value={itinerary.auto_sort_enabled === true}
+                        />
+                    </View>
+                )}
             </View>
 
             {/* Scrollable Content */}
@@ -268,7 +430,13 @@ const ItineraryDetailsScreen = () => {
                                 onPress={() => navigation.navigate('Attractions', { screen: 'AttractionDetails', params: { attractionId: item.id } })}
                                 activeOpacity={0.8}
                             >
-                                <Image source={getFirstPhoto(item.id)} style={styles.image} />
+                                <Image
+                                    source={(() => {
+                                        const publicUrl = getPublicImageUrl(item.primary_photo_bucket, item.primary_photo_path);
+                                        return publicUrl ? { uri: publicUrl } : getFirstPhoto(item.id);
+                                    })()}
+                                    style={styles.image}
+                                />
                                 <View style={styles.cardContent}>
                                     <Text style={styles.attractionName} numberOfLines={1}>{item.name}</Text>
                                     <View style={styles.cardMeta}>
@@ -284,7 +452,7 @@ const ItineraryDetailsScreen = () => {
                             </TouchableOpacity>
                             <View style={styles.actions}>
                                 {/* Manual Reorder Buttons */}
-                                {(!itinerary.auto_sort_enabled && !itinerary.is_public) && (
+                                {(canEdit && ((itinerary.mode === 'manual' || itinerary.mode === 'flexible') || (!itinerary.mode && !itinerary.auto_sort_enabled))) && (
                                     <View style={styles.reorderButtons}>
                                         <TouchableOpacity
                                             style={[styles.actionButton, index === 0 && styles.disabledButton]}
@@ -302,12 +470,16 @@ const ItineraryDetailsScreen = () => {
                                         </TouchableOpacity>
                                     </View>
                                 )}
-                                <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-                                    <Ionicons name="create-outline" size={18} color="#666" />
-                                </TouchableOpacity>
-                                <TouchableOpacity style={styles.actionButton} onPress={() => handleRemoveAttraction(item.id)}>
-                                    <Ionicons name="close-circle-outline" size={18} color="#D71A28" />
-                                </TouchableOpacity>
+                                {canEdit && (
+                                    <>
+                                        <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
+                                            <Ionicons name="create-outline" size={18} color="#666" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.actionButton} onPress={() => handleRemoveAttraction(item.id)}>
+                                            <Ionicons name="close-circle-outline" size={18} color="#D71A28" />
+                                        </TouchableOpacity>
+                                    </>
+                                )}
                             </View>
                         </View>
                     ))
@@ -327,23 +499,47 @@ const ItineraryDetailsScreen = () => {
                         <View style={styles.inputRow}>
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>Start Time</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="09:00 AM"
-                                    placeholderTextColor="#999"
-                                    value={startTime}
-                                    onChangeText={setStartTime}
-                                />
+                                <TouchableOpacity onPress={() => setShowStartPicker(true)} activeOpacity={0.8}>
+                                    <View pointerEvents="none">
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Select time"
+                                            placeholderTextColor="#999"
+                                            value={startTime}
+                                            editable={false}
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+                                {showStartPicker && (
+                                    <DateTimePicker
+                                        value={startTimeValue || new Date()}
+                                        mode="time"
+                                        display="default"
+                                        onChange={onStartTimeChange}
+                                    />
+                                )}
                             </View>
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>End Time</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="11:00 AM"
-                                    placeholderTextColor="#999"
-                                    value={endTime}
-                                    onChangeText={setEndTime}
-                                />
+                                <TouchableOpacity onPress={() => setShowEndPicker(true)} activeOpacity={0.8}>
+                                    <View pointerEvents="none">
+                                        <TextInput
+                                            style={styles.input}
+                                            placeholder="Select time"
+                                            placeholderTextColor="#999"
+                                            value={endTime}
+                                            editable={false}
+                                        />
+                                    </View>
+                                </TouchableOpacity>
+                                {showEndPicker && (
+                                    <DateTimePicker
+                                        value={endTimeValue || new Date()}
+                                        mode="time"
+                                        display="default"
+                                        onChange={onEndTimeChange}
+                                    />
+                                )}
                             </View>
                         </View>
                         <Text style={styles.label}>Price (BHD)</Text>
@@ -416,6 +612,10 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#1a1a1a',
         marginHorizontal: 12,
+    },
+    headerSpacer: {
+        width: 22,
+        height: 22,
     },
     summaryRow: {
         flexDirection: 'row',

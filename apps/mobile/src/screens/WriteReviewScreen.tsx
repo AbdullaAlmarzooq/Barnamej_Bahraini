@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, ScrollView, Alert, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { createReview } from '@barnamej/supabase-client';
+import { supabase } from '@barnamej/supabase-client';
 import Button from '../components/Button';
+import { useAuth } from '../context/AuthContext';
 
 const WriteReviewScreen = () => {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
     const { attractionId } = route.params;
+    const { user } = useAuth();
 
     const [name, setName] = useState('');
     const [comment, setComment] = useState('');
@@ -19,6 +22,26 @@ const WriteReviewScreen = () => {
         service: 0,
         experience: 0,
     });
+
+    useEffect(() => {
+        const loadProfileName = async () => {
+            if (!user) return;
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', user.id)
+                .single();
+
+            if (error) {
+                console.error('[Profile] load error:', error);
+                return;
+            }
+
+            setName(data?.full_name || '');
+        };
+
+        loadProfileName();
+    }, [user]);
 
     const handleRatingChange = (category: keyof typeof ratings, value: number) => {
         setRatings(prev => ({ ...prev, [category]: value }));
@@ -39,7 +62,7 @@ const WriteReviewScreen = () => {
                 service_rating: ratings.service,
                 experience_rating: ratings.experience,
                 comment,
-            });
+            }, 'approved');
             if (error) throw error;
 
             Alert.alert('Success', 'Thank you for your feedback!', [
@@ -80,15 +103,17 @@ const WriteReviewScreen = () => {
                 <Text style={styles.subtitle}>Share your experience with others</Text>
 
                 <View style={styles.form}>
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Your Name</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your name"
-                            value={name}
-                            onChangeText={setName}
-                        />
-                    </View>
+                    {!user && (
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.label}>Your Name</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter your name"
+                                value={name}
+                                onChangeText={setName}
+                            />
+                        </View>
+                    )}
 
                     {renderStarInput('Price', 'price')}
                     {renderStarInput('Cleanliness', 'cleanliness')}

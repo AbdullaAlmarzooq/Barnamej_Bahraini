@@ -88,12 +88,12 @@ export async function getReview(id: string) {
 /**
  * Create a new review (status defaults to 'pending')
  */
-export async function createReview(input: ReviewInput) {
+export async function createReview(input: ReviewInput, statusOverride?: ReviewStatus) {
     const { data, error } = await supabase
         .from('reviews')
         .insert({
             ...input,
-            status: 'pending', // Always start as pending for moderation
+            status: statusOverride || 'pending',
         })
         .select()
         .single();
