@@ -1,0 +1,28 @@
+.itinerary-details-page {
+    max-width: 1200px;
+}
+
+.details-card {
+    margin-bottom: var(--space-xl);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+}
+
+.details-grid .form-group {
+    margin-bottom: 0;
+}
+
+.details-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 768px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}

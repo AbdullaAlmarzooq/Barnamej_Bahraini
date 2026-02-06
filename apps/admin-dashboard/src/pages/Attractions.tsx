@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
     fetchAttractions,
     deleteAttraction,
@@ -264,17 +265,23 @@ const Attractions = () => {
                                         <td>BD {attraction.price?.toFixed(2) || '0.00'}</td>
                                         <td>
                                             <div className="flex gap-sm">
+                                                <Link
+                                                    className="btn btn-secondary btn-sm"
+                                                    to={`/admin/attractions/${attraction.id}`}
+                                                >
+                                                    View
+                                                </Link>
                                                 <button
                                                     className="btn btn-secondary btn-sm"
                                                     onClick={() => handleEdit(attraction)}
                                                 >
-                                                    ✏️
+                                                    Edit
                                                 </button>
                                                 <button
                                                     className="btn btn-danger btn-sm"
                                                     onClick={() => handleDelete(attraction.id)}
                                                 >
-                                                    🗑️
+                                                    Delete
                                                 </button>
                                             </div>
                                         </td>
@@ -291,6 +298,7 @@ const Attractions = () => {
                 onClose={() => setIsModalOpen(false)}
                 title={editingAttraction ? 'Edit Attraction' : 'Add New Attraction'}
                 closeOnOverlayClick={false}
+                className="modal-wide"
                 footer={
                     <>
                         <button

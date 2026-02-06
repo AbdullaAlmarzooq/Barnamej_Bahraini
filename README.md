@@ -32,7 +32,7 @@
 - 📍 **Attraction Discovery**: Browse, search, and filter tourist attractions
 - 🗺️ **Itinerary Planning**: Create, manage, and share trip itineraries
 - ⭐ **Reviews System**: Multi-criteria rating system (Price, Cleanliness, Service, Experience)
-- 🔄 **Offline Support**: Local SQLite database with background sync
+- 🔄 **Offline Support**: Supabase-backed sync queue with background sync
 - 🖥️ **Admin Dashboard**: Web-based management interface
 
 ### Tech Stack
@@ -40,10 +40,9 @@
 | Component | Technology |
 |-----------|------------|
 | Mobile App | React Native (Expo SDK 54), TypeScript |
-| Backend Server | Express.js 5, better-sqlite3 |
+| Backend Server | Express.js 5, Supabase (PostgreSQL) |
 | Admin Dashboard | React (Vite), TypeScript |
-| Local Database | expo-sqlite (SQLite) |
-| Server Database | SQLite via better-sqlite3 |
+| Database | Supabase (PostgreSQL) |
 | Navigation | React Navigation 7 |
 
 ---
@@ -68,10 +67,10 @@ Barnamej_Bahraini/
 ### Data Flow Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌────────────────────────────────────────────────────────────────┐
 │                        Mobile App                                │
 │  ┌──────────┐    ┌─────────────┐    ┌──────────────────────┐   │
-│  │ Screens  │───▶│  Services   │───▶│  Local SQLite (expo) │   │
+│  │ Screens  │───▶│  Services   │───▶│  Supabase Client     │   │
 │  └──────────┘    └──────▲──────┘    └──────────▲───────────┘   │
 │                         │                      │               │
 │                  ┌──────┴───────┐    ┌─────────┴─────────┐     │
@@ -83,9 +82,9 @@ Barnamej_Bahraini/
                           ▼                      ▼
               ┌───────────────────────────────────────────┐
               │            Express.js Server              │
-              │  ┌─────────────┐    ┌─────────────────┐  │
-              │  │ REST API    │───▶│ SQLite (better) │  │
-              │  └─────────────┘    └─────────────────┘  │
+              │  ┌─────────────┐    ┌─────────────────┐   │
+              │  │ REST API    │───▶│ Supabase (PG)   │   │
+              │  └─────────────┘    └─────────────────┘   │
               └───────────────────────────────────────────┘
                           ▲
                           │
@@ -110,7 +109,7 @@ The backend is a single-file Express.js server (`legacy-server/index.js`) runnin
 | CORS Middleware | Cross-origin request handling |
 | body-parser | JSON request body parsing |
 | Static Files | Serves `/public` and `/assets` directories |
-| better-sqlite3 | Synchronous SQLite database driver |
+| Supabase Client/REST | PostgreSQL database access |
 
 ### API Routes Reference
 
@@ -151,27 +150,10 @@ The backend is a single-file Express.js server (`legacy-server/index.js`) runnin
 ### Key Business Logic
 
 #### Review Rating Calculation
-```javascript
-// Individual review rating is average of 4 criteria
-const reviewRating = (price_rating + cleanliness_rating + 
-                      service_rating + experience_rating) / 4;
-
-// Attraction rating is average of all review ratings
-const avgRating = reviews.reduce((acc, r) => 
-  acc + (r.price_rating + r.cleanliness_rating + 
-         r.service_rating + r.experience_rating) / 4, 0) / reviews.length;
-```
+Review ratings are computed in PostgreSQL using a generated column (`overall_rating`) and a trigger that updates `attractions.avg_rating` and `attractions.total_reviews`. See `docs/database/schema.md`.
 
 #### Itinerary Price Recalculation
-When attractions are added/removed from itineraries, total_price is automatically recalculated:
-```javascript
-const result = db.prepare(`
-  SELECT SUM(a.price) as total 
-  FROM itinerary_attractions ia 
-  JOIN attractions a ON ia.attraction_id = a.id 
-  WHERE ia.itinerary_id = ?
-`).get(itineraryId);
-```
+When attractions are added/removed from itineraries, totals are automatically recalculated by a PostgreSQL trigger (`update_itinerary_totals`) in Supabase.
 
 ---
 
@@ -186,7 +168,7 @@ The mobile app follows a modular architecture with clear separation of concerns:
 | Screens | `apps/mobile/src/screens/` | Page-level components |
 | Components | `apps/mobile/src/components/` | Reusable UI elements |
 | Services | `apps/mobile/src/services/` | Business logic & data access |
-| DB Layer | `apps/mobile/src/db/` | SQLite client, migrations, sync |
+| DB Layer | `apps/mobile/src/db/` | Supabase client, sync |
 | Navigation | `apps/mobile/src/navigation/` | Routing configuration |
 
 ### Navigation Structure
@@ -217,7 +199,7 @@ NavigationContainer
 - Quick action navigation cards
 - Call-to-action for trip planning
 
-**Data Source**: `getFeaturedAttractions()`, `getItineraries()` from local SQLite
+**Data Source**: `getFeaturedAttractions()`, `getItineraries()` via Supabase
 
 ---
 
@@ -304,32 +286,18 @@ A styled button with three variants:
 ### Database Layer (`apps/mobile/src/db/`)
 
 #### `client.ts` - Database Client
-**Purpose**: Singleton SQLite connection manager with preloaded database support
+**Purpose**: Singleton Supabase client initialization
 
 **Key Features**:
 - Lazy initialization with `getDB()`
-- Copies bundled database from assets on first run
-- Corruption detection and auto-recovery
-- WAL mode enabled for performance
-- Development mode flag for optional DB reset
+- Centralized Supabase configuration
 
 ```typescript
 export const getDB = async () => DatabaseClient.getInstance().getDB();
 ```
 
 #### `migrator.ts` - Migration System
-**Purpose**: Schema versioning with checksum validation
-
-**Current Migrations**:
-1. `0001_init` - Base tables
-2. `0002_add_search_index` - Search optimization
-3. `0003_fix_itinerary_table` - Schema corrections
-4. `0004_add_sorting` - Sort order support
-
-**Features**:
-- Tracks executed migrations in `migrations` table
-- Checksum validation to detect modified migrations
-- Version tracking in `schema_meta` table
+**Purpose**: Supabase schema changes are managed in PostgreSQL migrations (see `docs/database/schema.md`)
 
 #### `queue/queue.ts` - Sync Queue
 **Purpose**: Offline-first data persistence
@@ -360,7 +328,7 @@ export const initSyncService = () => {
 ### Services Layer
 
 #### `database.ts` - Data Access Service
-**Purpose**: High-level data operations using local SQLite
+**Purpose**: High-level data operations using Supabase (PostgreSQL)
 
 **Key Functions**:
 
@@ -370,7 +338,7 @@ export const initSyncService = () => {
 | `getAllAttractions()` | Fetch all attractions |
 | `getFeaturedAttractions()` | Top 5 by rating |
 | `getAttractionById(id)` | Single attraction |
-| `addReview(review)` | Save locally + queue for sync |
+| `addReview(review)` | Save and sync via Supabase |
 | `getReviewsForAttraction(id)` | Reviews for attraction |
 | `createItinerary(name, desc, isPublic, creator)` | Create + queue |
 | `getItineraries()` | All with counts |
@@ -446,108 +414,21 @@ Displays:
 
 ## Database Schema
 
-### Tables
+### Database Overview
 
-```sql
--- Core attractions table
-attractions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  description TEXT,
-  category TEXT,
-  location TEXT,
-  image TEXT,
-  rating REAL DEFAULT 0,
-  price REAL DEFAULT 0
-)
+The primary database is Supabase (PostgreSQL). It uses UUID primary keys, enums for domain values, Row Level Security (RLS), triggers/functions for computed fields, and views for common queries. Relationship data is modeled via junction tables (e.g., `itinerary_attractions`). For the authoritative schema, see `docs/database/schema.md`.
 
--- Multiple photos per attraction
-attraction_photos (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  attraction_id INTEGER NOT NULL,
-  url TEXT NOT NULL,
-  is_primary INTEGER DEFAULT 0,
-  display_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (attraction_id) REFERENCES attractions(id) ON DELETE CASCADE
-)
+The database schema is defined in Supabase/PostgreSQL and documented here:
 
--- Multi-criteria reviews
-reviews (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  attraction_id INTEGER,
-  name TEXT,
-  price_rating INTEGER,
-  cleanliness_rating INTEGER,
-  service_rating INTEGER,
-  experience_rating INTEGER,
-  comment TEXT,
-  rating REAL DEFAULT 0,
-  age INTEGER,
-  nationality_id INTEGER,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (attraction_id) REFERENCES attractions(id)
-)
+- `docs/database/schema.md` (single source of truth)
 
--- User itineraries
-itineraries (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL,
-  description TEXT,
-  is_public INTEGER DEFAULT 0,
-  is_auto_sort_enabled INTEGER DEFAULT 0,
-  creator_name TEXT,
-  total_price REAL DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-)
-
--- Junction table for itinerary-attractions
-itinerary_attractions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  itinerary_id INTEGER,
-  attraction_id INTEGER,
-  start_time TEXT,
-  end_time TEXT,
-  price REAL DEFAULT 0,
-  notes TEXT,
-  sort_order INTEGER DEFAULT 0,
-  FOREIGN KEY (itinerary_id) REFERENCES itineraries(id),
-  FOREIGN KEY (attraction_id) REFERENCES attractions(id)
-)
-
--- Offline sync queue (mobile only)
-sync_queue (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT,
-  payload TEXT,
-  status TEXT DEFAULT 'pending',
-  retry_count INTEGER DEFAULT 0,
-  priority INTEGER DEFAULT 1,
-  last_error TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-)
-
--- Migration tracking
-migrations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  checksum TEXT,
-  executed_at TEXT DEFAULT CURRENT_TIMESTAMP
-)
-
--- Schema version tracking
-schema_meta (
-  version INTEGER
-)
-```
-
-### Entity Relationships
-
-```
-attractions (1) ─────< (N) attraction_photos
-attractions (1) ─────< (N) reviews
-attractions (N) >────< (N) itineraries [via itinerary_attractions]
-```
+Key characteristics:
+- UUID primary keys
+- Enums for domain values (e.g., attraction categories, review status)
+- Row Level Security (RLS) policies
+- Triggers and functions for ratings and itinerary totals
+- Views for common queries (e.g., attractions with primary photo, itineraries detailed)
+- Relationship tables such as `itinerary_attractions`
 
 ---
 
@@ -597,7 +478,14 @@ const API_BASE_URL = __DEV__
 - Windows: Run `ipconfig` in CMD
 - Mac/Linux: Run `ifconfig` or `ip addr`
 
-#### 5. Start the Backend Server
+#### 5. Configure Supabase Environment
+
+Set the following environment variables (e.g., in a `.env` file):
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+#### 6. Start the Backend Server
 
 ```bash
 cd legacy-server
@@ -608,7 +496,7 @@ npm start      # Production mode
 
 Server runs at `http://localhost:3000`
 
-#### 6. Start the Mobile App
+#### 7. Start the Mobile App
 
 ```bash
 cd ..  # Return to root
@@ -622,7 +510,7 @@ Then:
 - Press `i` for iOS simulator
 - Scan QR with Expo Go app for physical device
 
-#### 7. Start Admin Dashboard (Optional)
+#### 8. Start Admin Dashboard (Optional)
 
 ```bash
 cd apps/admin-dashboard
@@ -649,6 +537,8 @@ Terminal 3 (Dashboard):  cd apps/admin-dashboard && npm run dev
 | Location | Setting | Description |
 |----------|---------|-------------|
 | `apps/mobile/src/services/api.ts` | `API_BASE_URL` | Backend server URL |
+| `.env` | `SUPABASE_URL` | Supabase project URL |
+| `.env` | `SUPABASE_ANON_KEY` | Supabase anon public key |
 | `legacy-server/index.js` | `PORT` | Server port (default: 3000) |
 | `app.json` | Various | Expo app configuration |
 
@@ -667,15 +557,15 @@ Terminal 3 (Dashboard):  cd apps/admin-dashboard && npm run dev
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "plugins": ["expo-font", "expo-sqlite", "expo-asset"]
+    "plugins": ["expo-font", "expo-asset"]
   }
 }
 ```
 
 ### Database Location
 
-- **Server**: `assets/database/Barnamej.db`
-- **Mobile (Runtime)**: `${documentDirectory}/SQLite/barnamej_v2.db`
+- **Primary Database**: Supabase-hosted PostgreSQL (cloud)
+- **Local Storage**: No file-based SQLite database
 
 ### Development Flags
 
@@ -703,8 +593,8 @@ const DEV_FORCE_DB_RESET = false; // Set true to reset DB on each launch
 
 1. **TypeScript Usage**: Proper typing throughout the mobile app
 2. **Modular Architecture**: Clear separation between screens, components, and services
-3. **Offline-First Design**: Local database with background sync
-4. **Migration System**: Versioned schema changes with checksums
+3. **Offline-First Design**: Sync queue with Supabase backend
+4. **Database Governance**: Centralized schema in Supabase (`schema.md`)
 5. **Consistent Styling**: Cohesive red (#D71A28) brand color
 6. **Error Handling**: Try-catch blocks with user-friendly alerts
 
@@ -750,17 +640,14 @@ app.post('/route', (req, res) => {
 |-------|----------|------|----------------|
 | No Authentication | All endpoints | HIGH | Add JWT auth |
 | No Input Validation | Server routes | MEDIUM | Add validation |
-| SQL Prepared Statements | ✅ Used | LOW | Good practice |
+| RLS Policies | ✅ Enabled | LOW | Enforce row-level access |
 | CORS Wide Open | Server | MEDIUM | Restrict origins |
 | No Rate Limiting | Server | MEDIUM | Add express-rate-limit |
 | Hardcoded IP | `api.ts` | LOW | Use env variables |
 
 ### SQL Injection Protection
 
-The project uses prepared statements which is good:
-```javascript
-db.prepare('SELECT * FROM attractions WHERE id = ?').get(req.params.id);
-```
+Database access is mediated through Supabase with Row Level Security (RLS) policies and server-side functions, reducing direct SQL exposure from the clients.
 
 ### Recommended Security Additions
 
@@ -776,18 +663,17 @@ db.prepare('SELECT * FROM attractions WHERE id = ?').get(req.params.id);
 
 ### Current Optimizations
 
-1. **SQLite WAL Mode**: Enabled for better concurrent access
-2. **Preloaded Database**: Ships with bundled data
-3. **Lazy Loading**: DB initialized only when needed
+1. **Supabase Indexing**: Indexed fields for common queries
+2. **Computed Fields**: Cached totals and ratings
+3. **Views**: Pre-joined views for common reads
 4. **Batch Sync**: Queue processes items in batches
 5. **Optimistic Updates**: UI updates before server response
 
 ### Bottlenecks
 
-1. **Single Server DB File**: Not suitable for high concurrency
-2. **No Caching**: Every request hits the database
-3. **Sync on Every Network Change**: Could be rate-limited
-4. **No Pagination**: All attractions loaded at once
+1. **No Caching**: Every request hits the database
+2. **Sync on Every Network Change**: Could be rate-limited
+3. **No Pagination**: All attractions loaded at once
 
 ### Scaling Recommendations
 
@@ -795,7 +681,6 @@ db.prepare('SELECT * FROM attractions WHERE id = ?').get(req.params.id);
 |-------------|--------|--------|
 | Add Redis caching | Medium | High |
 | Implement pagination | Low | Medium |
-| Move to PostgreSQL | High | High |
 | Add CDN for images | Medium | High |
 | Throttle sync service | Low | Low |
 
@@ -808,7 +693,7 @@ db.prepare('SELECT * FROM attractions WHERE id = ?').get(req.params.id);
 1. **No Production Deployment**: Project appears to be in development
 2. **Single Developer**: Codebase optimized for solo development
 3. **Demo Data**: Attractions are pre-seeded Bahraini landmarks
-4. **No User Accounts**: All data is public or device-local
+4. **User Accounts via Supabase Auth**: Schema includes `auth.users`/profiles; confirm app login flow
 5. **Bahrain Context**: Prices in BHD, locations are Bahraini cities
 
 ### Missing Information
@@ -870,10 +755,10 @@ npm run preview    # Preview production build
 |------|---------|
 | `App.tsx` | Mobile app entry point |
 | `server/index.js` | Complete backend server |
-| `src/services/database.ts` | Local data operations |
-| `src/db/client.ts` | SQLite connection manager |
+| `src/services/database.ts` | Data operations (Supabase) |
+| `src/db/client.ts` | Supabase client initialization |
 | `src/navigation/AppNavigator.tsx` | Navigation structure |
-| `assets/database/Barnamej.db` | Preloaded database |
+| `docs/database/schema.md` | Supabase PostgreSQL schema |
 
 ---
 

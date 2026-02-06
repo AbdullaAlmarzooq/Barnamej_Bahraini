@@ -243,6 +243,11 @@ p {
   background-color: var(--color-bg-hover);
 }
 
+.table tbody tr:hover .btn-secondary {
+  background-color: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+}
+
 .table tbody tr:last-child td {
   border-bottom: none;
 }
@@ -311,6 +316,10 @@ p {
   max-height: 90vh;
   overflow-y: auto;
   animation: slideUp var(--transition-normal);
+}
+
+.modal-wide {
+  max-width: 760px;
 }
 
 @keyframes slideUp {

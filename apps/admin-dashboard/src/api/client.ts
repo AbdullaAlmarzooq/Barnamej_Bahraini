@@ -18,7 +18,9 @@ import type {
     Review,
     Itinerary,
     ItineraryAttraction,
-    Statistics
+    Statistics,
+    CategoryRating,
+    ReviewTrendPoint
 } from '../types'
 
 // ============================================
@@ -118,7 +120,8 @@ export async function fetchReviews(attractionId?: string): Promise<Review[]> {
         .from('reviews')
         .select(`
       *,
-      attraction:attractions(id, name)
+      attraction:attractions(id, name),
+      nationality:nationalities(id, name)
     `)
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -219,4 +222,79 @@ export async function fetchStatistics(): Promise<Statistics> {
         total_itineraries: totalItineraries || 0,
         average_rating: Math.round(averageRating * 100) / 100,
     }
+}
+
+// ============================================
+// DASHBOARD ANALYTICS
+// ============================================
+
+export async function fetchRatingByCategory(): Promise<CategoryRating[]> {
+    const { data, error } = await supabase
+        .from('attractions')
+        .select('category, avg_rating, total_reviews')
+        .is('deleted_at', null)
+        .eq('is_active', true)
+
+    if (error) throw new Error(error.message)
+
+    const buckets = new Map<string, { sumRating: number; sumReviews: number; count: number }>()
+    for (const row of data || []) {
+        const category = row.category as string
+        const avgRating = Number(row.avg_rating || 0)
+        const totalReviews = Number(row.total_reviews || 0)
+        const bucket = buckets.get(category) || { sumRating: 0, sumReviews: 0, count: 0 }
+        bucket.sumRating += avgRating * totalReviews
+        bucket.sumReviews += totalReviews
+        bucket.count += 1
+        buckets.set(category, bucket)
+    }
+
+    return Array.from(buckets.entries()).map(([category, bucket]) => ({
+        category: category as CategoryRating['category'],
+        average_rating: bucket.sumReviews > 0 ? bucket.sumRating / bucket.sumReviews : 0,
+        total_reviews: bucket.sumReviews,
+        attraction_count: bucket.count
+    }))
+}
+
+function startOfWeek(date: Date) {
+    const result = new Date(date)
+    const day = result.getUTCDay() // 0 = Sunday
+    const diff = (day + 6) % 7 // shift so Monday is start
+    result.setUTCDate(result.getUTCDate() - diff)
+    result.setUTCHours(0, 0, 0, 0)
+    return result
+}
+
+export async function fetchReviewTrend(weeks = 8): Promise<ReviewTrendPoint[]> {
+    const now = new Date()
+    const endWeek = startOfWeek(now)
+    const start = new Date(endWeek)
+    start.setUTCDate(start.getUTCDate() - (weeks - 1) * 7)
+
+    const { data, error } = await supabase
+        .from('reviews')
+        .select('created_at')
+        .is('deleted_at', null)
+        .eq('status', 'approved')
+        .gte('created_at', start.toISOString())
+
+    if (error) throw new Error(error.message)
+
+    const counts = new Map<string, number>()
+    for (const row of data || []) {
+        const createdAt = new Date(row.created_at)
+        const weekStart = startOfWeek(createdAt).toISOString()
+        counts.set(weekStart, (counts.get(weekStart) || 0) + 1)
+    }
+
+    const points: ReviewTrendPoint[] = []
+    for (let i = 0; i < weeks; i++) {
+        const week = new Date(start)
+        week.setUTCDate(start.getUTCDate() + i * 7)
+        const key = week.toISOString()
+        points.push({ week_start: key, count: counts.get(key) || 0 })
+    }
+
+    return points
 }

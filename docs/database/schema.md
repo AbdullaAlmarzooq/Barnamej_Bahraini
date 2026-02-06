@@ -3,6 +3,11 @@
 
 ⚠️ This file is the SINGLE SOURCE OF TRUTH for all database queries. Never assume or invent column names outside this document.
 
+-- IMPORTANT:
+-- This schema reflects the production Supabase database.
+-- Some triggers and functions are managed separately and documented here
+-- to preserve accuracy without re-deploying live logic.
+
 This document defines the PostgreSQL database schema used in Supabase.
 It is the single source of truth for the backend data structure of:
 
@@ -249,6 +254,14 @@ CREATE TABLE itineraries (
   CHECK (start_date IS NULL OR end_date IS NULL OR end_date >= start_date)
 );
 
+  -- Itinerary type / behavior
+  mode itinerary_mode NOT NULL
+
+CREATE TYPE itinerary_mode AS ENUM (
+  'manual',
+  'auto'
+);
+
 CREATE INDEX idx_itineraries_user ON itineraries(user_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_itineraries_public ON itineraries(is_public) WHERE is_public = true AND deleted_at IS NULL;
 CREATE INDEX idx_itineraries_featured ON itineraries(is_featured) WHERE is_featured = true AND deleted_at IS NULL;
@@ -297,6 +310,36 @@ CREATE INDEX idx_itinerary_attractions_schedule ON itinerary_attractions(schedul
 CREATE UNIQUE INDEX unique_itinerary_position
   ON itinerary_attractions(itinerary_id, position)
   WHERE deleted_at IS NULL;
+
+  -- NOTE:
+-- The following triggers exist in production but are managed separately:
+-- - check_itinerary_mode → validate_itinerary_mode()
+-- - no_time_overlap → prevent_time_overlap()
+-- - trg_prevent_overlap → prevent_itinerary_time_overlap()
+--
+-- These functions enforce scheduling integrity and itinerary constraints.
+
+  -- ============================================================================
+-- PROFILES
+-- ============================================================================
+
+create table public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+
+
+  email text,
+  full_name text,
+  avatar_url text,
+
+  
+  birthdate date,
+  role text not null default 'user', -- 'admin' | 'user'
+
+ 
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  deleted_at timestamptz null
+);
 
 -- ============================================================================
 -- AUDIT/SYNC TABLES (For offline-first mobile app)

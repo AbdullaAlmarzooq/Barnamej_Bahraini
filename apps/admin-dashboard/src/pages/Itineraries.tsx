@@ -1,5 +1,6 @@
 import { supabase } from '../api/client';
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
     fetchItineraries,
     deleteItinerary,
@@ -456,6 +457,12 @@ const Itineraries = () => {
                                     </td>
                                     <td>
                                         <div className="btn-group">
+                                            <Link
+                                                className="btn btn-sm btn-secondary"
+                                                to={`/admin/itineraries/${itinerary.id}`}
+                                            >
+                                                View
+                                            </Link>
                                             <button
                                                 className="btn btn-sm btn-secondary"
                                                 onClick={() => handleEdit(itinerary)}

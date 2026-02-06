@@ -154,3 +154,15 @@ export interface Statistics {
     total_itineraries: number;
     average_rating: number;
 }
+
+export interface CategoryRating {
+    category: AttractionCategory;
+    average_rating: number;
+    total_reviews: number;
+    attraction_count: number;
+}
+
+export interface ReviewTrendPoint {
+    week_start: string;
+    count: number;
+}

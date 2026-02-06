@@ -5,8 +5,10 @@ import Layout from './components/Layout/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Attractions from './pages/Attractions';
+import AttractionDetails from './pages/AttractionDetails';
 import Reviews from './pages/Reviews';
 import Itineraries from './pages/Itineraries';
+import ItineraryDetails from './pages/ItineraryDetails';
 
 function App() {
   return (
@@ -21,8 +23,10 @@ function App() {
             <Route element={<Layout />}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="attractions" element={<Attractions />} />
+              <Route path="attractions/:id" element={<AttractionDetails />} />
               <Route path="reviews" element={<Reviews />} />
               <Route path="itineraries" element={<Itineraries />} />
+              <Route path="itineraries/:id" element={<ItineraryDetails />} />
               {/* Default redirect for /admin */}
               <Route index element={<Navigate to="dashboard" replace />} />
             </Route>
