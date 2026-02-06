@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getFirstPhoto } from '../utils/attractionPhotos';
+import { getPublicImageUrl } from '../utils/supabaseStorage';
 
 interface AttractionCardProps {
     attraction: {
@@ -10,12 +11,15 @@ interface AttractionCardProps {
         category: string;
         image: string;
         rating: number;
+        primary_photo_path?: string | null;
+        primary_photo_bucket?: string | null;
     };
     onPress: () => void;
 }
 
 const AttractionCard: React.FC<AttractionCardProps> = ({ attraction, onPress }) => {
-    const imageSource = getFirstPhoto(attraction.id);
+    const publicUrl = getPublicImageUrl(attraction.primary_photo_bucket, attraction.primary_photo_path);
+    const imageSource = publicUrl ? { uri: publicUrl } : getFirstPhoto(attraction.id);
     const rating = typeof attraction.rating === 'number' ? attraction.rating : 0;
 
     return (

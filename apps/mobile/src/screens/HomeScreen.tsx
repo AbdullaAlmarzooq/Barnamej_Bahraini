@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getFeaturedAttractions, getItineraries } from '@barnamej/supabase-client';
 import { getFirstPhoto } from '../utils/attractionPhotos';
+import { getPublicImageUrl } from '../utils/supabaseStorage';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.7;
@@ -115,7 +116,10 @@ const HomeScreen = () => {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.carouselContent}
                     >
-                        {featuredAttractions.map((attraction) => (
+                        {featuredAttractions.map((attraction) => {
+                            const publicUrl = getPublicImageUrl(attraction.primary_photo_bucket, attraction.primary_photo_path);
+                            const imageSource = publicUrl ? { uri: publicUrl } : getFirstPhoto(attraction.id);
+                            return (
                             <TouchableOpacity
                                 key={attraction.id}
                                 style={styles.featuredCard}
@@ -125,10 +129,7 @@ const HomeScreen = () => {
                                 })}
                                 activeOpacity={0.9}
                             >
-                                <Image
-                                    source={getFirstPhoto(attraction.id)}
-                                    style={styles.featuredImage}
-                                />
+                                <Image source={imageSource} style={styles.featuredImage} />
                                 <View style={styles.featuredOverlay}>
                                     <View style={styles.ratingBadge}>
                                         <Ionicons name="star" size={12} color="#FFD700" />
@@ -143,7 +144,7 @@ const HomeScreen = () => {
                                     </View>
                                 </View>
                             </TouchableOpacity>
-                        ))}
+                        )})}
                     </ScrollView>
                 </View>
 

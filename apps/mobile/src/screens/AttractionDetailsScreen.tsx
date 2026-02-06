@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, Dim
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getAttraction, getReviewsForAttraction } from '@barnamej/supabase-client';
+import { getAttractionWithPhotos, getReviewsForAttraction } from '@barnamej/supabase-client';
 import Button from '../components/Button';
 import { getPhotosForAttraction } from '../utils/attractionPhotos';
+import { getPublicImageUrl } from '../utils/supabaseStorage';
 
 const { width } = Dimensions.get('window');
 
@@ -22,7 +23,7 @@ const AttractionDetailsScreen = () => {
         useCallback(() => {
             const loadData = async () => {
                 try {
-                    const { data: attractionData, error: attractionError } = await getAttraction(String(attractionId));
+                    const { data: attractionData, error: attractionError } = await getAttractionWithPhotos(String(attractionId));
                     if (attractionError) throw attractionError;
                     if (attractionData) {
                         setAttraction(attractionData);
@@ -78,7 +79,11 @@ const AttractionDetailsScreen = () => {
     const experienceRating = calculateAverage('experience_rating');
 
     const attractionNumericId = typeof attraction.id === 'number' ? attraction.id : Number(attraction.id);
-    const photos = getPhotosForAttraction(Number.isNaN(attractionNumericId) ? attraction.id : attractionNumericId);
+    const localPhotos = getPhotosForAttraction(Number.isNaN(attractionNumericId) ? attraction.id : attractionNumericId);
+    const remotePhotos = (attraction.photos || [])
+        .map((p: any) => getPublicImageUrl(p.storage_bucket, p.storage_path))
+        .filter((url: string | null) => Boolean(url)) as string[];
+    const photos = remotePhotos.length > 0 ? remotePhotos : localPhotos;
     const displayCategory = (attraction.category || '')
         .toString()
         .replace(/_/g, ' ')
@@ -102,7 +107,11 @@ const AttractionDetailsScreen = () => {
                         scrollEventThrottle={16}
                     >
                         {photos.map((photo: any, index: number) => (
-                            <Image key={index} source={photo} style={styles.image} />
+                            <Image
+                                key={index}
+                                source={typeof photo === 'string' ? { uri: photo } : photo}
+                                style={styles.image}
+                            />
                         ))}
                     </ScrollView>
                     {photos.length > 1 && (
