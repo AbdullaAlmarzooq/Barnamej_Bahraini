@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, Dim
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getAttractionById, getReviewsForAttraction } from '../services/database';
+import { getAttraction, getReviewsForAttraction } from '@barnamej/supabase-client';
 import Button from '../components/Button';
 import { getPhotosForAttraction } from '../utils/attractionPhotos';
 
@@ -22,11 +22,13 @@ const AttractionDetailsScreen = () => {
         useCallback(() => {
             const loadData = async () => {
                 try {
-                    const attractionData = await getAttractionById(attractionId);
+                    const { data: attractionData, error: attractionError } = await getAttraction(String(attractionId));
+                    if (attractionError) throw attractionError;
                     if (attractionData) {
                         setAttraction(attractionData);
-                        const reviewsData = await getReviewsForAttraction(attractionId);
-                        setReviews(reviewsData);
+                        const { data: reviewsData, error: reviewsError } = await getReviewsForAttraction(String(attractionId));
+                        if (reviewsError) throw reviewsError;
+                        setReviews(reviewsData || []);
                     } else {
                         Alert.alert('Error', 'Attraction not found.');
                         navigation.goBack();
@@ -75,7 +77,15 @@ const AttractionDetailsScreen = () => {
     const serviceRating = calculateAverage('service_rating');
     const experienceRating = calculateAverage('experience_rating');
 
-    const photos = getPhotosForAttraction(attraction.id);
+    const attractionNumericId = typeof attraction.id === 'number' ? attraction.id : Number(attraction.id);
+    const photos = getPhotosForAttraction(Number.isNaN(attractionNumericId) ? attraction.id : attractionNumericId);
+    const displayCategory = (attraction.category || '')
+        .toString()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char: string) => char.toUpperCase());
+    const overallRating = typeof attraction.avg_rating === 'number'
+        ? attraction.avg_rating
+        : (typeof attraction.rating === 'number' ? attraction.rating : 0);
 
     return (
         <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -114,7 +124,7 @@ const AttractionDetailsScreen = () => {
                     <View style={styles.header}>
                         <Text style={styles.name}>{attraction.name}</Text>
                         <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{attraction.category}</Text>
+                            <Text style={styles.badgeText}>{displayCategory}</Text>
                         </View>
                     </View>
 
@@ -128,13 +138,13 @@ const AttractionDetailsScreen = () => {
                     <View style={styles.ratingsSection}>
                         <Text style={styles.sectionTitle}>Ratings</Text>
                         <View style={styles.overallRating}>
-                            <Text style={styles.overallScore}>{attraction.rating.toFixed(1)}</Text>
+                            <Text style={styles.overallScore}>{overallRating.toFixed(1)}</Text>
                             <View>
                                 <View style={{ flexDirection: 'row' }}>
                                     {[1, 2, 3, 4, 5].map((star) => (
                                         <Ionicons
                                             key={star}
-                                            name={star <= Math.round(attraction.rating) ? "star" : "star-outline"}
+                                            name={star <= Math.round(overallRating) ? "star" : "star-outline"}
                                             size={20}
                                             color="#FFD700"
                                         />
@@ -174,7 +184,7 @@ const AttractionDetailsScreen = () => {
                             reviews.map((review) => (
                                 <View key={review.id} style={styles.reviewCard}>
                                     <View style={styles.reviewHeader}>
-                                        <Text style={styles.reviewerName}>{review.name}</Text>
+                                        <Text style={styles.reviewerName}>{review.reviewer_name || 'Anonymous'}</Text>
                                         <Text style={styles.reviewDate}>{new Date(review.created_at).toLocaleDateString()}</Text>
                                     </View>
                                     <Text style={styles.reviewComment}>{review.comment}</Text>

@@ -3,7 +3,14 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, Image, Modal
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getItineraryDetails, removeFromItinerary, deleteItinerary, updateItineraryAttraction, toggleItineraryAutoSort, reorderItineraryAttractions } from '../services/database';
+import {
+    getItineraryWithAttractions,
+    removeAttractionFromItinerary,
+    deleteItinerary,
+    updateItineraryAttraction,
+    toggleAutoSort,
+    reorderItineraryAttractions
+} from '@barnamej/supabase-client';
 import { getFirstPhoto } from '../utils/attractionPhotos';
 import Button from '../components/Button';
 
@@ -26,13 +33,36 @@ const ItineraryDetailsScreen = () => {
         }, [itineraryId])
     );
 
+    const normalizeItinerary = (data: any) => ({
+        ...data,
+        is_public: Boolean(data.is_public),
+        auto_sort_enabled: Boolean(data.auto_sort_enabled),
+        attractions: (data.attractions || []).map((item: any) => {
+            const attractionId = item.attraction?.id;
+            const numericId = typeof attractionId === 'number' ? attractionId : Number(attractionId);
+            const categoryRaw = (item.attraction?.category || '').toString().replace(/_/g, ' ');
+            return {
+                link_id: item.id,
+                start_time: item.scheduled_start_time,
+                end_time: item.scheduled_end_time,
+                price: item.custom_price ?? item.attraction?.price ?? 0,
+                notes: item.notes,
+                id: Number.isNaN(numericId) ? attractionId : numericId,
+                name: item.attraction?.name,
+                category: categoryRaw.replace(/\b\w/g, (char: string) => char.toUpperCase()),
+            };
+        }),
+    });
+
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const data = await getItineraryDetails(itineraryId);
+            const { data, error } = await getItineraryWithAttractions(String(itineraryId));
+            if (error) throw error;
             if (data) {
-                console.log('Loaded itinerary with', data.attractions?.length || 0, 'attractions');
-                setItinerary(data);
+                const normalized = normalizeItinerary(data);
+                console.log('Loaded itinerary with', normalized.attractions?.length || 0, 'attractions');
+                setItinerary(normalized);
             } else {
                 Alert.alert('Error', 'Itinerary not found or failed to load.');
                 navigation.goBack();
@@ -56,7 +86,8 @@ const ItineraryDetailsScreen = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await deleteItinerary(itineraryId);
+                            const { error } = await deleteItinerary(String(itineraryId));
+                            if (error) throw error;
                             navigation.goBack();
                         } catch (error) {
                             Alert.alert('Error', 'Failed to delete itinerary.');
@@ -67,7 +98,7 @@ const ItineraryDetailsScreen = () => {
         );
     };
 
-    const handleRemoveAttraction = (attractionId: number) => {
+    const handleRemoveAttraction = (attractionId: string) => {
         Alert.alert(
             'Remove Attraction',
             'Remove this attraction from itinerary?',
@@ -78,7 +109,8 @@ const ItineraryDetailsScreen = () => {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await removeFromItinerary(itineraryId, attractionId);
+                            const { error } = await removeAttractionFromItinerary(String(itineraryId), String(attractionId));
+                            if (error) throw error;
                             loadData();
                         } catch (error) {
                             Alert.alert('Error', 'Failed to remove attraction.');
@@ -100,7 +132,13 @@ const ItineraryDetailsScreen = () => {
     const handleSaveEdit = async () => {
         if (!editingItem) return;
         try {
-            await updateItineraryAttraction(editingItem.link_id, startTime, endTime, parseFloat(price) || 0, notes);
+            const { error } = await updateItineraryAttraction(String(editingItem.link_id), {
+                scheduled_start_time: startTime || null,
+                scheduled_end_time: endTime || null,
+                custom_price: price ? parseFloat(price) : null,
+                notes: notes || null,
+            });
+            if (error) throw error;
             setEditingItem(null);
             loadData();
         } catch (error) {
@@ -111,8 +149,9 @@ const ItineraryDetailsScreen = () => {
     const handleToggleAutoSort = async (value: boolean) => {
         try {
             // Optimistic update
-            setItinerary((prev: any) => ({ ...prev, is_auto_sort_enabled: value ? 1 : 0 }));
-            await toggleItineraryAutoSort(itineraryId, value);
+            setItinerary((prev: any) => ({ ...prev, auto_sort_enabled: value }));
+            const { error } = await toggleAutoSort(String(itineraryId), value);
+            if (error) throw error;
             loadData(); // Reload to get sorted list if enabled
         } catch (error) {
             Alert.alert('Error', 'Failed to toggle auto-sort.');
@@ -137,7 +176,8 @@ const ItineraryDetailsScreen = () => {
         try {
             // Create ordered list of link_ids (which serves as the "identity" for the attraction in the itinerary)
             const orderedLinkIds = newAttractions.map((item: any) => item.link_id);
-            await reorderItineraryAttractions(itineraryId, orderedLinkIds);
+            const { error } = await reorderItineraryAttractions(String(itineraryId), orderedLinkIds);
+            if (error) throw error;
             // No need to reload data immediately as we optimistically updated, 
             // but reloading ensures full consistency
             loadData();
@@ -192,11 +232,11 @@ const ItineraryDetailsScreen = () => {
                     <Text style={styles.toggleLabel}>Auto-sort attractions by time</Text>
                     <Switch
                         trackColor={{ false: "#767577", true: "#D71A28" }}
-                        thumbColor={itinerary.is_auto_sort_enabled ? "#fff" : "#f4f3f4"}
+                        thumbColor={itinerary.auto_sort_enabled ? "#fff" : "#f4f3f4"}
                         ios_backgroundColor="#3e3e3e"
                         onValueChange={handleToggleAutoSort}
-                        value={itinerary.is_auto_sort_enabled === 1}
-                        disabled={itinerary.is_public === 1}
+                        value={itinerary.auto_sort_enabled === true}
+                        disabled={itinerary.is_public === true}
                     />
                 </View>
             </View>
@@ -244,7 +284,7 @@ const ItineraryDetailsScreen = () => {
                             </TouchableOpacity>
                             <View style={styles.actions}>
                                 {/* Manual Reorder Buttons */}
-                                {(!itinerary.is_auto_sort_enabled && !itinerary.is_public) && (
+                                {(!itinerary.auto_sort_enabled && !itinerary.is_public) && (
                                     <View style={styles.reorderButtons}>
                                         <TouchableOpacity
                                             style={[styles.actionButton, index === 0 && styles.disabledButton]}

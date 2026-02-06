@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ScrollVi
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getAllAttractions } from '../services/database';
+import { getAttractions } from '@barnamej/supabase-client';
 import AttractionCard from '../components/AttractionCard';
 
 const AttractionsListScreen = () => {
@@ -19,9 +19,22 @@ const AttractionsListScreen = () => {
         useCallback(() => {
             const loadData = async () => {
                 try {
-                    const data = await getAllAttractions();
-                    setAttractions(data);
-                    setFilteredAttractions(data);
+                    const { data, error } = await getAttractions();
+                    if (error) throw error;
+                    const list = (data || []).map((a: any) => {
+                        const numericId = typeof a.id === 'number' ? a.id : Number(a.id);
+                        const rating = typeof a.avg_rating === 'number' ? a.avg_rating : (a.rating ?? 0);
+                        const categoryRaw = (a.category || '').toString().replace(/_/g, ' ');
+                        const category = categoryRaw.replace(/\b\w/g, (char: string) => char.toUpperCase());
+                        return {
+                            ...a,
+                            id: Number.isNaN(numericId) ? a.id : numericId,
+                            rating,
+                            category,
+                        };
+                    });
+                    setAttractions(list);
+                    setFilteredAttractions(list);
                 } catch (error) {
                     console.error('Failed to load attractions:', error);
                 }
@@ -38,14 +51,15 @@ const AttractionsListScreen = () => {
         let result = attractions;
 
         if (selectedCategory !== 'All') {
-            result = result.filter(a => a.category === selectedCategory);
+            const selected = selectedCategory.toLowerCase();
+            result = result.filter(a => (a.category || '').toLowerCase() === selected);
         }
 
         if (searchQuery) {
             const query = searchQuery.toLowerCase();
             result = result.filter(a =>
-                a.name.toLowerCase().includes(query) ||
-                a.location.toLowerCase().includes(query)
+                (a.name || '').toLowerCase().includes(query) ||
+                (a.location || '').toLowerCase().includes(query)
             );
         }
 

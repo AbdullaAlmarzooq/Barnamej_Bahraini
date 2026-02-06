@@ -16,6 +16,7 @@ interface AttractionCardProps {
 
 const AttractionCard: React.FC<AttractionCardProps> = ({ attraction, onPress }) => {
     const imageSource = getFirstPhoto(attraction.id);
+    const rating = typeof attraction.rating === 'number' ? attraction.rating : 0;
 
     return (
         <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.9}>
@@ -25,7 +26,7 @@ const AttractionCard: React.FC<AttractionCardProps> = ({ attraction, onPress }) 
                     <Text style={styles.name} numberOfLines={1}>{attraction.name}</Text>
                     <View style={styles.ratingContainer}>
                         <Ionicons name="star" size={14} color="#FFD700" />
-                        <Text style={styles.rating}>{attraction.rating.toFixed(1)}</Text>
+                        <Text style={styles.rating}>{rating.toFixed(1)}</Text>
                     </View>
                 </View>
                 <Text style={styles.category}>{attraction.category}</Text>

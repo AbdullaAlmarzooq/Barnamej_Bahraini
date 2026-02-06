@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getItineraries, getPublicItineraries, createItinerary, addToItinerary, getItineraryDetails } from '../services/database';
+import { getItineraries, createItinerary, addAttractionToItinerary } from '@barnamej/supabase-client';
 import Button from '../components/Button';
 
 const ItineraryListScreen = () => {
@@ -27,18 +27,15 @@ const ItineraryListScreen = () => {
 
     const loadItineraries = async () => {
         try {
-            let data = [];
-            if (activeTab === 'my') {
-                data = await getItineraries();
-            } else {
-                data = await getPublicItineraries();
-            }
+            const { data, error } = await getItineraries(activeTab === 'my' ? 'private' : 'public');
+            if (error) throw error;
 
-            // The server now returns attraction_count in the list response
-            setItineraries(data.map((it: any) => ({
+            const list = (data || []).map((it: any) => ({
                 ...it,
-                count: it.attraction_count || 0
-            })));
+                count: it.total_attractions || 0,
+            }));
+
+            setItineraries(list);
         } catch (error) {
             Alert.alert('Error', 'Failed to load itineraries.');
             console.error(error);
@@ -52,7 +49,13 @@ const ItineraryListScreen = () => {
         }
 
         try {
-            await createItinerary(newItineraryName, newItineraryDesc, isPublic);
+            const { error } = await createItinerary({
+                name: newItineraryName,
+                description: newItineraryDesc || null,
+                is_public: isPublic,
+                creator_name: 'Me',
+            });
+            if (error) throw error;
             setNewItineraryName('');
             setNewItineraryDesc('');
             setIsPublic(false);
@@ -72,7 +75,11 @@ const ItineraryListScreen = () => {
             // Add attraction to this itinerary
             console.log('IN ADD MODE: Adding attraction', addToItineraryId, 'to itinerary', itinerary.id);
             try {
-                await addToItinerary(itinerary.id, addToItineraryId);
+                const { error } = await addAttractionToItinerary({
+                    itinerary_id: String(itinerary.id),
+                    attraction_id: String(addToItineraryId),
+                });
+                if (error) throw error;
                 Alert.alert('Success', 'Attraction added to itinerary!', [
                     { text: 'OK', onPress: () => navigation.goBack() }
                 ]);

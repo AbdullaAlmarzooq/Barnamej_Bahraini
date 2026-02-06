@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getFeaturedAttractions, getItineraries } from '../services/database';
+import { getFeaturedAttractions, getItineraries } from '@barnamej/supabase-client';
 import { getFirstPhoto } from '../utils/attractionPhotos';
 
 const { width } = Dimensions.get('window');
@@ -24,10 +24,23 @@ const HomeScreen = () => {
     const loadData = async () => {
         try {
             setLoading(true);
-            const [attractions, itineraries] = await Promise.all([
+            const [attractionsResult, itinerariesResult] = await Promise.all([
                 getFeaturedAttractions(),
-                getItineraries()
+                getItineraries('private')
             ]);
+            if (attractionsResult.error) throw attractionsResult.error;
+            if (itinerariesResult.error) throw itinerariesResult.error;
+
+            const attractions = (attractionsResult.data || []).map((a: any) => {
+                const numericId = typeof a.id === 'number' ? a.id : Number(a.id);
+                return {
+                    ...a,
+                    id: Number.isNaN(numericId) ? a.id : numericId,
+                    avg_rating: typeof a.avg_rating === 'number' ? a.avg_rating : (a.rating ?? 0),
+                };
+            });
+            const itineraries = itinerariesResult.data || [];
+
             setFeaturedAttractions(attractions.slice(0, 5));
             setRecentItineraries(itineraries.slice(0, 3));
         } catch (error) {
@@ -119,14 +132,14 @@ const HomeScreen = () => {
                                 <View style={styles.featuredOverlay}>
                                     <View style={styles.ratingBadge}>
                                         <Ionicons name="star" size={12} color="#FFD700" />
-                                        <Text style={styles.ratingText}>{attraction.rating?.toFixed(1) || '0.0'}</Text>
+                                        <Text style={styles.ratingText}>{(attraction.avg_rating ?? 0).toFixed(1)}</Text>
                                     </View>
                                 </View>
                                 <View style={styles.featuredInfo}>
                                     <Text style={styles.featuredName} numberOfLines={1}>{attraction.name}</Text>
                                     <View style={styles.featuredMeta}>
                                         <Ionicons name="location-outline" size={12} color="#666" />
-                                        <Text style={styles.featuredLocation}>{attraction.location}</Text>
+                                        <Text style={styles.featuredLocation}>{attraction.location || ''}</Text>
                                     </View>
                                 </View>
                             </TouchableOpacity>
@@ -158,7 +171,7 @@ const HomeScreen = () => {
                                 <View style={styles.itineraryInfo}>
                                     <Text style={styles.itineraryName}>{itinerary.name}</Text>
                                     <Text style={styles.itineraryMeta}>
-                                        {itinerary.attraction_count || 0} stops • {itinerary.total_price?.toFixed(2) || '0.00'} BHD
+                                        {itinerary.total_attractions || 0} stops • {itinerary.total_price?.toFixed(2) || '0.00'} BHD
                                     </Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color="#ccc" />

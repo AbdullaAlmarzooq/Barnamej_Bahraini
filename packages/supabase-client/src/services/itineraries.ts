@@ -171,7 +171,9 @@ export async function deleteItinerary(id: string) {
 /**
  * Add an attraction to an itinerary
  */
-export async function addAttractionToItinerary(input: ItineraryAttractionInput) {
+export async function addAttractionToItinerary(
+    input: Omit<ItineraryAttractionInput, 'position'> & { position?: number }
+) {
     // Get the next position
     const { data: existing } = await supabase
         .from('itinerary_attractions')

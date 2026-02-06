@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, ScrollView, Alert, TouchableOpacity 
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { addReview } from '../services/database';
+import { createReview } from '@barnamej/supabase-client';
 import Button from '../components/Button';
 
 const WriteReviewScreen = () => {
@@ -31,15 +31,16 @@ const WriteReviewScreen = () => {
         }
 
         try {
-            await addReview({
-                attraction_id: attractionId,
-                name,
+            const { error } = await createReview({
+                attraction_id: String(attractionId),
+                reviewer_name: name,
                 price_rating: ratings.price,
                 cleanliness_rating: ratings.cleanliness,
                 service_rating: ratings.service,
                 experience_rating: ratings.experience,
                 comment,
             });
+            if (error) throw error;
 
             Alert.alert('Success', 'Thank you for your feedback!', [
                 { text: 'OK', onPress: () => navigation.goBack() }
