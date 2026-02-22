@@ -22,6 +22,22 @@ const Login = () => {
         }
     }, [location]);
 
+    const toLoginErrorMessage = (err: any) => {
+        const message = err?.message || '';
+
+        // Browser/network failures usually surface as "Failed to fetch"
+        // when Supabase host is unreachable (DNS/network/proxy/VPN).
+        if (
+            message.includes('Failed to fetch') ||
+            message.includes('NetworkError') ||
+            message.includes('ERR_NAME_NOT_RESOLVED')
+        ) {
+            return 'Cannot reach Supabase Auth. Check VITE_SUPABASE_URL and your network/DNS settings.';
+        }
+
+        return message || 'Failed to login';
+    };
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -39,7 +55,7 @@ const Login = () => {
             // check the role, and trigger a re-render.
             // UseEffect below will handle the redirect.
         } catch (err: any) {
-            setError(err.message || 'Failed to login');
+            setError(toLoginErrorMessage(err));
             setLoading(false);
         }
     };

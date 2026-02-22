@@ -20,6 +20,7 @@
 10. [Security Considerations](#security-considerations)
 11. [Performance & Scalability](#performance--scalability)
 12. [Assumptions & Missing Information](#assumptions--missing-information)
+13. [Changelog](#changelog)
 
 ---
 
@@ -154,6 +155,13 @@ Review ratings are computed in PostgreSQL using a generated column (`overall_rat
 
 #### Itinerary Price Recalculation
 When attractions are added/removed from itineraries, totals are automatically recalculated by a PostgreSQL trigger (`update_itinerary_totals`) in Supabase.
+
+#### Itinerary Duration by Mode
+`update_itinerary_totals` is mode-aware:
+- `flexible`: duration = sum of attraction `estimated_duration_minutes`.
+- `scheduled`: duration = `latest scheduled_end_time - earliest scheduled_start_time`.
+
+Scheduled itineraries also enforce `auto_sort_enabled = true` via a `BEFORE INSERT OR UPDATE` trigger on `itineraries`.
 
 ---
 
@@ -716,6 +724,10 @@ Database access is mediated through Supabase with Row Level Security (RLS) polic
 3. **Image Loading**: Newly added attractions need `sync-photos` script run
 
 ---
+
+## Changelog
+
+Recent implementation history is tracked in `Barnamej_Bahraini/changelog.md`.
 
 ## Scripts Reference
 

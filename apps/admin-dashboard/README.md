@@ -1,73 +1,43 @@
-# React + TypeScript + Vite
+# Admin Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite admin app for managing attractions, reviews, and itineraries.
 
-Currently, two official plugins are available:
+## Run Locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd /Users/abdullaalmarzooq/Barnamej_Bahraini/Barnamej_Bahraini/apps/admin-dashboard
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Default local URL:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- `http://localhost:5173`
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Build
+
+```bash
+npm run build
+npm run preview
 ```
+
+## Key Notes
+
+- Favicon is loaded from `public/favicon.png`.
+- Current favicon source is synced from `/Users/abdullaalmarzooq/Barnamej_Bahraini/Barnamej_Bahraini/assets/adaptive-icon.png`.
+- Itineraries page reads data directly from Supabase and is subject to RLS policies.
+- Private itineraries owned by other users require explicit admin read policies in Supabase to appear in this app.
+
+## Itinerary Behavior
+
+- Scheduled itinerary time inputs normalize to `HH:mm` and update in place.
+- Modal start/end time controls are controlled inputs to avoid stale values after refreshes.
+- In the table actions column:
+- `View` is always shown.
+- `Edit` and `Delete` are shown only for public itineraries.
+
+## Related Docs
+
+- Root technical docs: `/Users/abdullaalmarzooq/Barnamej_Bahraini/Barnamej_Bahraini/README.md`
+- Change history: `/Users/abdullaalmarzooq/Barnamej_Bahraini/Barnamej_Bahraini/changelog.md`
+- Schema and DB triggers: `/Users/abdullaalmarzooq/Barnamej_Bahraini/Barnamej_Bahraini/docs/database/schema.md`
