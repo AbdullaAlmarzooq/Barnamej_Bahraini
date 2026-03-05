@@ -20,8 +20,22 @@
 }
 
 .stat-card-icon {
-    font-size: 2rem;
-    line-height: 1;
+    width: 42px;
+    height: 42px;
+    border: 1px solid var(--color-border-light);
+    border-radius: 12px;
+    background: rgba(215, 26, 40, 0.05);
+    color: var(--color-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-card-icon svg {
+    width: 22px;
+    height: 22px;
+    stroke-width: 1.9;
 }
 
 .stat-card-content {

@@ -60,67 +60,69 @@ const Reviews = () => {
             {error && <div className="error-message">{error}</div>}
 
             <div className="card">
-                <div className="reviews-list">
-                    {reviews.length === 0 ? (
-                        <div className="empty-state">
-                            <div className="empty-state-icon">⭐</div>
-                            <p>No reviews available</p>
-                        </div>
-                    ) : (
-                        reviews.map((review) => (
-                            <div key={review.id} className="review-item">
-                                <div className="review-header">
-                                    <div>
-                                        <strong>{review.reviewer_name || 'Anonymous'}</strong>
-                                        <span className="text-muted text-sm ml-sm">
-                                            {new Date(review.created_at).toLocaleDateString()}
-                                        </span>
-                                        <div className="text-sm font-bold text-primary mt-1">
-                                            📍 {review.attraction?.name || 'Unknown Attraction'}
-                                        </div>
-                                        <div className="text-xs text-muted mt-1">
-                                            {review.age ? `Age: ${review.age}` : ''}
-                                            {review.age && review.nationality ? ' • ' : ''}
-                                            {review.nationality ? `from ${review.nationality}` : ''}
-                                        </div>
-                                    </div>
-                                    <button
-                                        className="btn btn-danger btn-sm"
-                                        onClick={() => handleDelete(review.id)}
-                                    >
-                                        🗑️ Delete
-                                    </button>
-                                </div>
+                <div className="table-container reviews-table-container">
+                    <table className="table reviews-table">
+                        <thead>
+                            <tr>
+                                <th>Reviewer</th>
+                                <th>Attraction</th>
+                                <th>Ratings</th>
+                                <th>Comment</th>
+                                <th>Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {reviews.length === 0 ? (
+                                <tr>
+                                    <td colSpan={6} className="text-center text-muted">
+                                        No reviews available
+                                    </td>
+                                </tr>
+                            ) : (
+                                reviews.map((review) => {
+                                    const demographics = [
+                                        review.age ? `Age ${review.age}` : null,
+                                        review.nationality?.name || null,
+                                    ].filter(Boolean).join(' • ')
 
-                                <div className="review-ratings">
-                                    <div className="rating-item">
-                                        <span className="rating-label">Overall:</span>
-                                        <span className="rating-value">⭐ {(review.overall_rating || 0).toFixed(1)}</span>
-                                    </div>
-                                    <div className="rating-item">
-                                        <span className="rating-label">Price:</span>
-                                        <span className="rating-value">{review.price_rating || 0}/5</span>
-                                    </div>
-                                    <div className="rating-item">
-                                        <span className="rating-label">Cleanliness:</span>
-                                        <span className="rating-value">{review.cleanliness_rating || 0}/5</span>
-                                    </div>
-                                    <div className="rating-item">
-                                        <span className="rating-label">Service:</span>
-                                        <span className="rating-value">{review.service_rating || 0}/5</span>
-                                    </div>
-                                    <div className="rating-item">
-                                        <span className="rating-label">Experience:</span>
-                                        <span className="rating-value">{review.experience_rating || 0}/5</span>
-                                    </div>
-                                </div>
-
-                                <div className="review-comment">
-                                    {review.comment}
-                                </div>
-                            </div>
-                        ))
-                    )}
+                                    return (
+                                        <tr key={review.id}>
+                                            <td>
+                                                <div className="reviewer-cell">
+                                                    <strong>{review.reviewer_name || 'Anonymous'}</strong>
+                                                    {demographics && (
+                                                        <span className="text-sm text-muted">{demographics}</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td>{review.attraction?.name || 'Unknown Attraction'}</td>
+                                            <td>
+                                                <div className="overall-rating">⭐ {(review.overall_rating || 0).toFixed(1)}</div>
+                                                <div className="criteria-rating text-sm text-muted">
+                                                    P {review.price_rating || 0} • C {review.cleanliness_rating || 0} • S {review.service_rating || 0} • E {review.experience_rating || 0}
+                                                </div>
+                                            </td>
+                                            <td className="review-comment-cell">
+                                                {review.comment || 'No comment'}
+                                            </td>
+                                            <td className="text-sm text-muted">
+                                                {new Date(review.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td>
+                                                <button
+                                                    className="btn btn-danger btn-sm"
+                                                    onClick={() => handleDelete(review.id)}
+                                                >
+                                                    Delete
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

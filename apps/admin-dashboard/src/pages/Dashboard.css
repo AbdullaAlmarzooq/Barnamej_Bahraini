@@ -1,5 +1,6 @@
 .dashboard {
-    max-width: 1200px;
+    width: 100%;
+    max-width: none;
 }
 
 .dashboard-header {
@@ -135,8 +136,22 @@
 }
 
 .action-icon {
-    font-size: 3rem;
-    margin-bottom: var(--space-md);
+    width: 48px;
+    height: 48px;
+    margin: 0 auto var(--space-md);
+    border-radius: 14px;
+    border: 1px solid var(--color-border-light);
+    background: rgba(215, 26, 40, 0.04);
+    color: var(--color-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-icon svg {
+    width: 24px;
+    height: 24px;
+    stroke-width: 1.9;
 }
 
 .action-title {

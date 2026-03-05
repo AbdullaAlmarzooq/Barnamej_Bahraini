@@ -1,14 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
+import { IconAttractions, IconDashboard, IconItineraries, IconReviews } from '../Common/LineIcons';
 import './Sidebar.css';
 
 const Sidebar = () => {
   const location = useLocation();
 
   const menuItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/admin/attractions', label: 'Attractions', icon: '🏛️' },
-    { path: '/admin/reviews', label: 'Reviews', icon: '⭐' },
-    { path: '/admin/itineraries', label: 'Itineraries', icon: '🗺️' },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: <IconDashboard /> },
+    { path: '/admin/attractions', label: 'Attractions', icon: <IconAttractions /> },
+    { path: '/admin/reviews', label: 'Reviews', icon: <IconReviews /> },
+    { path: '/admin/itineraries', label: 'Itineraries', icon: <IconItineraries /> },
   ];
 
   return (

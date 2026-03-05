@@ -1,9 +1,11 @@
 .itineraries-page {
-    max-width: 1400px;
+    width: 100%;
+    max-width: none;
 }
 
 .page-container {
-    max-width: 1400px;
+    width: 100%;
+    max-width: none;
 }
 
 .page-header {

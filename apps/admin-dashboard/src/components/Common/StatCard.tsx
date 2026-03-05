@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react';
 import './StatCard.css';
 
 interface StatCardProps {
     title: string;
     value: string | number;
-    icon: string;
+    icon: ReactNode;
     trend?: {
         value: string;
         isPositive: boolean;

@@ -1,58 +1,48 @@
 .reviews-page {
-    max-width: 1000px;
+    width: 100%;
+    max-width: none;
 }
 
-.reviews-list {
+.reviews-table-container {
+    box-shadow: none;
+    border: 1px solid var(--color-border-light);
+}
+
+.reviews-table th,
+.reviews-table td {
+    vertical-align: top;
+}
+
+.reviewer-cell {
     display: flex;
     flex-direction: column;
-    gap: var(--space-lg);
-}
-
-.review-item {
-    padding: var(--space-lg);
-    border: 1px solid var(--color-border-light);
-    border-radius: var(--radius-md);
-    background-color: var(--color-bg);
-}
-
-.review-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-md);
-    padding-bottom: var(--space-md);
-    border-bottom: 1px solid var(--color-border-light);
-}
-
-.review-ratings {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-md);
-    margin-bottom: var(--space-md);
-}
-
-.rating-item {
-    display: flex;
-    align-items: center;
     gap: var(--space-xs);
 }
 
-.rating-label {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
+.overall-rating {
+    font-weight: 700;
+    margin-bottom: 2px;
+    white-space: nowrap;
 }
 
-.rating-value {
-    font-weight: 600;
+.criteria-rating {
+    white-space: nowrap;
+}
+
+.review-comment-cell {
+    min-width: 320px;
+    max-width: 420px;
     color: var(--color-text-primary);
+    line-height: 1.45;
 }
 
-.review-comment {
-    font-size: 0.9375rem;
-    line-height: 1.6;
-    color: var(--color-text-primary);
+.reviews-table td .btn {
+    white-space: nowrap;
 }
 
-.ml-sm {
-    margin-left: var(--space-sm);
+@media (max-width: 960px) {
+    .review-comment-cell {
+        min-width: 220px;
+        max-width: 320px;
+    }
 }
