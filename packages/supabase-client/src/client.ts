@@ -17,7 +17,10 @@ function getSupabaseConfig(): { url: string; anonKey: string } {
     if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_SUPABASE_URL) {
         return {
             url: process.env.EXPO_PUBLIC_SUPABASE_URL,
-            anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+            anonKey:
+                process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+                process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+                '',
         }
     }
 
@@ -25,7 +28,10 @@ function getSupabaseConfig(): { url: string; anonKey: string } {
     if (typeof globalThis !== 'undefined' && (globalThis as any).import?.meta?.env?.VITE_SUPABASE_URL) {
         return {
             url: (globalThis as any).import.meta.env.VITE_SUPABASE_URL,
-            anonKey: (globalThis as any).import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+            anonKey:
+                (globalThis as any).import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+                (globalThis as any).import.meta.env.VITE_SUPABASE_ANON_KEY ||
+                '',
         }
     }
 

@@ -7,9 +7,12 @@ import { createClient } from '@supabase/supabase-js'
 
 // Initialize Supabase client for browser
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+const supabaseKey =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Import types
 import type {
@@ -208,12 +211,14 @@ export async function fetchStatistics(): Promise<Statistics> {
     // Get average rating
     const { data: ratingData } = await supabase
         .from('attractions')
-        .select('avg_rating')
+        .select('avg_rating, total_reviews')
         .is('deleted_at', null)
         .eq('is_active', true)
 
-    const averageRating = ratingData && ratingData.length > 0
-        ? ratingData.reduce((sum, a) => sum + (a.avg_rating || 0), 0) / ratingData.length
+    const ratedAttractions = (ratingData || []).filter((a) => Number(a.total_reviews || 0) > 0)
+
+    const averageRating = ratedAttractions.length > 0
+        ? ratedAttractions.reduce((sum, a) => sum + Number(a.avg_rating || 0), 0) / ratedAttractions.length
         : 0
 
     return {

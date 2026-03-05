@@ -35,6 +35,10 @@ const Login = () => {
             return 'Cannot reach Supabase Auth. Check VITE_SUPABASE_URL and your network/DNS settings.';
         }
 
+        if (message.includes('Legacy API keys are disabled')) {
+            return 'Supabase legacy anon/service_role keys are disabled. Set VITE_SUPABASE_PUBLISHABLE_KEY in your env and restart the app.';
+        }
+
         return message || 'Failed to login';
     };
 

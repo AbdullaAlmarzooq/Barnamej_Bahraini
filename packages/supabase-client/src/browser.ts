@@ -9,6 +9,7 @@ import { initSupabase } from './client'
 // For Vite, use import.meta.env
 declare const import_meta_env: {
     VITE_SUPABASE_URL?: string
+    VITE_SUPABASE_PUBLISHABLE_KEY?: string
     VITE_SUPABASE_ANON_KEY?: string
 }
 
@@ -34,11 +35,11 @@ function getEnvVar(viteKey: string): string {
 }
 
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL')
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY')
+const supabaseKey = getEnvVar('VITE_SUPABASE_PUBLISHABLE_KEY') || getEnvVar('VITE_SUPABASE_ANON_KEY')
 
 // Initialize the shared client
-if (supabaseUrl && supabaseAnonKey) {
-    initSupabase(supabaseUrl, supabaseAnonKey)
+if (supabaseUrl && supabaseKey) {
+    initSupabase(supabaseUrl, supabaseKey)
 }
 
 // Re-export client and supabase for direct access

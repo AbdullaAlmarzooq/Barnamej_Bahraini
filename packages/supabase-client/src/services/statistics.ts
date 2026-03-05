@@ -41,14 +41,15 @@ export async function getStatistics(): Promise<{ data: Statistics | null; error:
         // Get average rating across all attractions
         const { data: ratingData, error: ratingError } = await supabase
             .from('attractions')
-            .select('avg_rating')
+            .select('avg_rating, total_reviews')
             .is('deleted_at', null)
             .eq('is_active', true);
 
         if (ratingError) throw ratingError;
 
-        const averageRating = ratingData && ratingData.length > 0
-            ? ratingData.reduce((sum, a) => sum + (a.avg_rating || 0), 0) / ratingData.length
+        const ratedAttractions = (ratingData || []).filter((a) => Number(a.total_reviews || 0) > 0);
+        const averageRating = ratedAttractions.length > 0
+            ? ratedAttractions.reduce((sum, a) => sum + Number(a.avg_rating || 0), 0) / ratedAttractions.length
             : 0;
 
         return {
