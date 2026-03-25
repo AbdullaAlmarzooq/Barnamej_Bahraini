@@ -488,7 +488,12 @@ const API_BASE_URL = __DEV__
 
 #### 5. Configure Supabase Environment
 
-Set the following environment variables (e.g., in a `.env` file):
+Set the following environment variables in the root `.env` file:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+Legacy names are also supported by Expo config if you already have them:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
