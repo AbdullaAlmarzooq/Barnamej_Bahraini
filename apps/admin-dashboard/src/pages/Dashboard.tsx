@@ -3,6 +3,7 @@ import { fetchStatistics, fetchRatingByCategory, fetchReviewTrend } from '../api
 import { type Statistics, type CategoryRating, type ReviewTrendPoint } from '../types';
 import StatCard from '../components/Common/StatCard';
 import { IconAttractions, IconDashboard, IconItineraries, IconReviews } from '../components/Common/LineIcons';
+import UserDemographics from '../components/Dashboard/UserDemographics';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -164,6 +165,8 @@ const Dashboard = () => {
                         </div>
                     </div>
                 </div>
+
+                <UserDemographics />
 
                 <div className="card">
                     <div className="card-header">

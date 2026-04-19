@@ -2,12 +2,26 @@
 
 ## 2026-04-19
 
+### Admin Dashboard (`apps/admin-dashboard`)
+
+- Added a reusable `User Demographics` dashboard card to the admin overview page.
+- Added nationality distribution visualization as a pie chart with a legend and contributor total.
+- Added age group distribution visualization for review contributors using the ranges `18-24`, `25-34`, `35-44`, and `45+`.
+- Added demographic aggregation helpers that:
+- prefer `reviews.age` and `reviews.nationality_id`,
+- fall back to `profiles.birthdate` and `profiles.nationality_id` when needed,
+- deduplicate authenticated contributors by `user_id` before counting distributions.
+- Added loading, empty, and failure states for the demographics card.
+- Added explicit console logging around demographics fetch and aggregation to make dashboard debugging easier.
+
 ### Mobile App (`apps/mobile`)
 
 - Added nationality selection to the logged-in `My Account` profile flow and review submission flow.
 - Fixed profile loading so stored `birthdate` values render correctly again in the mobile account screen.
 - Added guest review nationality capture and saved it with submitted reviews.
 - Added logged-in review fallback prompting for nationality when the profile is incomplete, then saved it back to `profiles`.
+- Kept password changes separated from the profile demographics fields within the `My Account` screen.
+- Fixed account screen layout/alignment issues including the security header icon, edit badge placement, field alignment, and the bottom safe-area gap above the navigation bar.
 
 ### Shared Supabase Client (`packages/supabase-client`)
 
@@ -19,6 +33,7 @@
 
 - Added `profiles.nationality_id -> nationalities.id` as a nullable foreign key.
 - Added `idx_profiles_nationality` and documented the profile-to-nationality relationship in `schema.sql`, `docs/database/schema.md`, and `README.md`.
+- Added `scripts/backfill-review-nationality-random.sql` to backfill existing reviews with random active nationality IDs when needed.
 
 ## 2026-02-22
 

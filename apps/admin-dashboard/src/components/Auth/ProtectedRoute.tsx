@@ -1,9 +1,16 @@
+import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const ProtectedRoute = () => {
     const { session, loading, isAdmin, signOut } = useAuth();
     const location = useLocation();
+
+    useEffect(() => {
+        if (!loading && session && !isAdmin) {
+            void signOut();
+        }
+    }, [loading, session, isAdmin, signOut]);
 
     if (loading) {
         return (
@@ -20,8 +27,6 @@ const ProtectedRoute = () => {
 
     // 2. Logged in but not Admin -> Redirect to login (and sign out)
     if (!isAdmin) {
-        // Optionally sign out to clear the non-admin session
-        signOut();
         return <Navigate to="/login?error=unauthorized" replace />;
     }
 

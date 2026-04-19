@@ -281,7 +281,8 @@ NavigationContainer
 
 **Features**:
 - Loads stored profile `full_name`, `birthdate`, `email`, and `nationality_id`
-- Lets users edit birthdate and nationality from their mobile profile
+- Lets users edit birthdate and nationality together from the mobile profile form
+- Keeps password updates in a separate section on the same screen
 - Persists nationality for future review submissions
 
 ---
@@ -429,6 +430,18 @@ Displays:
 - Total Reviews count
 - Total Itineraries count
 - Average Rating across all attractions
+- Review rating by category
+- Review recency trend over recent weeks
+- User demographics from review contributors:
+- nationality distribution shown as a pie chart,
+- age group distribution shown as a bar chart,
+- age grouped into `18-24`, `25-34`, `35-44`, and `45+`
+
+### Admin Dashboard Notes
+
+- The dashboard demographics card is implemented as a reusable component in `apps/admin-dashboard/src/components/Dashboard/UserDemographics.tsx`.
+- Demographic aggregation prefers values saved directly on `reviews` and falls back to `profiles.birthdate` / `profiles.nationality_id` for authenticated users when review rows are incomplete.
+- Authenticated contributors are deduplicated by `user_id` before nationality and age-group totals are calculated.
 
 ---
 
@@ -761,6 +774,14 @@ npm start          # Start production server
 npm run dev        # Start with nodemon (auto-reload)
 npm run sync-photos # Regenerate attractionPhotos.ts from database
 ```
+
+### SQL Utilities
+
+```bash
+scripts/backfill-review-nationality-random.sql
+```
+
+- One-off SQL script to populate `reviews.nationality_id` for existing rows that are still `NULL`
 
 ### Admin Dashboard
 

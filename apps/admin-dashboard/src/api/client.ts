@@ -23,8 +23,10 @@ import type {
     ItineraryAttraction,
     Statistics,
     CategoryRating,
-    ReviewTrendPoint
+    ReviewTrendPoint,
+    UserDemographicsData
 } from '../types'
+import { buildUserDemographicsData, type ProfileDemographicsRecord, type ReviewDemographicsRecord } from '../utils/demographics'
 
 // ============================================
 // ATTRACTIONS API
@@ -302,4 +304,81 @@ export async function fetchReviewTrend(weeks = 8): Promise<ReviewTrendPoint[]> {
     }
 
     return points
+}
+
+export async function fetchReviewDemographics(): Promise<UserDemographicsData> {
+    console.info('[UserDemographics] Starting demographics fetch');
+
+    try {
+        const { data: reviewRows, error: reviewsError } = await supabase
+            .from('reviews')
+            .select(`
+        id,
+        user_id,
+        age,
+        nationality:nationalities(id, name)
+      `)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+
+        if (reviewsError) {
+            console.error('[UserDemographics] Failed to fetch reviews for demographics:', reviewsError);
+            throw new Error(reviewsError.message)
+        }
+
+        const reviews = (reviewRows || []) as ReviewDemographicsRecord[]
+        console.info(`[UserDemographics] Reviews fetched: ${reviews.length}`);
+        console.debug('[UserDemographics] Raw review demographics rows:', reviews);
+
+        const userIds = Array.from(
+            new Set(
+                reviews
+                    .map((review) => review.user_id)
+                    .filter((userId): userId is string => Boolean(userId))
+            )
+        )
+
+        let profilesByUserId = new Map<string, ProfileDemographicsRecord>()
+        console.info(`[UserDemographics] Unique authenticated contributors: ${userIds.length}`);
+
+        if (userIds.length > 0) {
+            const { data: profileRows, error: profilesError } = await supabase
+                .from('profiles')
+                .select(`
+          id,
+          birthdate,
+          nationality:nationalities(id, name)
+        `)
+                .in('id', userIds)
+                .is('deleted_at', null)
+
+            if (profilesError) {
+                console.warn(
+                    '[UserDemographics] Failed to fetch profile fallback data. Continuing with review-only demographics:',
+                    profilesError
+                )
+            } else {
+                const profiles = (profileRows || []) as ProfileDemographicsRecord[]
+                console.info(`[UserDemographics] Profile fallback rows fetched: ${profiles.length}`);
+                console.debug('[UserDemographics] Raw profile fallback rows:', profiles);
+
+                profilesByUserId = new Map(
+                    profiles.map((profile) => [profile.id, profile])
+                )
+            }
+        }
+
+        console.info('[UserDemographics] Building demographics aggregates');
+        const demographics = buildUserDemographicsData(reviews, profilesByUserId)
+
+        console.info(
+            `[UserDemographics] Demographics ready: reviews=${demographics.review_count}, contributors=${demographics.contributor_count}, nationalitySamples=${demographics.nationality_sample_count}, ageSamples=${demographics.age_sample_count}`
+        );
+
+        return demographics
+    } catch (error) {
+        console.log('[UserDemographics] Demographics fetch/transform failed:', error);
+        console.error('[UserDemographics] Demographics fetch/transform failed:', error);
+        throw error
+    }
 }

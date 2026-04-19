@@ -166,3 +166,24 @@ export interface ReviewTrendPoint {
     week_start: string;
     count: number;
 }
+
+export type AgeGroup = '18-24' | '25-34' | '35-44' | '45+';
+
+export interface DemographicDatum {
+    label: string;
+    count: number;
+    percentage: number;
+}
+
+export interface AgeGroupDatum extends DemographicDatum {
+    label: AgeGroup;
+}
+
+export interface UserDemographicsData {
+    review_count: number;
+    contributor_count: number;
+    nationality_sample_count: number;
+    age_sample_count: number;
+    nationality_distribution: DemographicDatum[];
+    age_group_distribution: AgeGroupDatum[];
+}
