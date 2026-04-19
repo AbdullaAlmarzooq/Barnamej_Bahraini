@@ -333,6 +333,7 @@ create table public.profiles (
 
   
   birthdate date,
+  nationality_id uuid references nationalities(id) on delete set null,
   role text not null default 'user', -- 'admin' | 'user'
 
  
@@ -340,6 +341,8 @@ create table public.profiles (
   updated_at timestamptz not null default now(),
   deleted_at timestamptz null
 );
+
+CREATE INDEX idx_profiles_nationality ON profiles(nationality_id) WHERE deleted_at IS NULL;
 
 -- ============================================================================
 -- AUDIT/SYNC TABLES (For offline-first mobile app)

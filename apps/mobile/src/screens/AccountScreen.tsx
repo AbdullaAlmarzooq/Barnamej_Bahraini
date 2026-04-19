@@ -12,9 +12,17 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { supabase } from '@barnamej/supabase-client';
+import {
+    formatBirthdayForDisplay,
+    formatDateForDatabase,
+    getNationalities,
+    parseDateOnlyString,
+    supabase,
+    type Nationality,
+} from '@barnamej/supabase-client';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import NationalityPickerField from '../components/NationalityPickerField';
 
 type Mode = 'signup' | 'login';
 
@@ -25,32 +33,63 @@ const AccountScreen = () => {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [birthdate, setBirthdate] = useState<Date | null>(null);
+    const [nationalityId, setNationalityId] = useState<string | null>(null);
+    const [nationalities, setNationalities] = useState<Nationality[]>([]);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [loadingProfile, setLoadingProfile] = useState(false);
+    const [loadingNationalities, setLoadingNationalities] = useState(false);
 
     useEffect(() => {
-        const loadProfile = async () => {
-            if (!user) return;
-            setLoadingProfile(true);
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('full_name, birthdate, email')
-                .eq('id', user.id)
-                .single();
+        const loadNationalities = async () => {
+            setLoadingNationalities(true);
+            const { data, error } = await getNationalities();
 
             if (error) {
-                console.error('[Profile] load error:', error);
-                setLoadingProfile(false);
+                console.error('[Nationalities] load error:', error);
+                setLoadingNationalities(false);
                 return;
             }
 
-            setFullName(data?.full_name || '');
+            setNationalities(data || []);
+            setLoadingNationalities(false);
+        };
+
+        loadNationalities();
+    }, []);
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            if (!user) {
+                setFullName('');
+                setEmail('');
+                setBirthdate(null);
+                setNationalityId(null);
+                return;
+            }
+
+            setLoadingProfile(true);
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name, birthdate, email, nationality_id')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (error) {
+                console.error('[Profile] load error:', error);
+            }
+
+            const metadata = (user.user_metadata || {}) as Record<string, unknown>;
+            const metadataBirthdate = typeof metadata.birthdate === 'string' ? metadata.birthdate : null;
+            const metadataNationalityId = typeof metadata.nationality_id === 'string' ? metadata.nationality_id : null;
+
+            setFullName(data?.full_name || (typeof metadata.full_name === 'string' ? metadata.full_name : ''));
             setEmail(data?.email || user.email || '');
-            setBirthdate(data?.birthdate ? new Date(data.birthdate) : null);
+            setBirthdate(parseDateOnlyString(data?.birthdate || metadataBirthdate));
+            setNationalityId(data?.nationality_id || metadataNationalityId || null);
             setLoadingProfile(false);
         };
 
@@ -59,10 +98,7 @@ const AccountScreen = () => {
 
     const formatDate = (date: Date | null) => {
         if (!date) return '';
-        const year = date.getFullYear();
-        const month = `${date.getMonth() + 1}`.padStart(2, '0');
-        const day = `${date.getDate()}`.padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return formatDateForDatabase(date);
     };
 
     const onDateChange = (_event: DateTimePickerEvent, selected?: Date) => {
@@ -78,6 +114,7 @@ const AccountScreen = () => {
         setFullName('');
         setEmail('');
         setBirthdate(null);
+        setNationalityId(null);
         setPassword('');
         setShowPassword(false);
         setError(null);
@@ -189,8 +226,8 @@ const AccountScreen = () => {
         setError(null);
 
         if (!user) return;
-        if (!fullName.trim() || !birthdate) {
-            setError('Please fill in all fields.');
+        if (!fullName.trim() || !birthdate || !nationalityId) {
+            setError('Please fill in full name, birthdate, and nationality.');
             return;
         }
 
@@ -199,12 +236,16 @@ const AccountScreen = () => {
             const birthdateValue = formatDate(birthdate);
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({
+                .upsert({
+                    id: user.id,
+                    email: email.trim() || user.email || null,
                     full_name: fullName.trim(),
                     birthdate: birthdateValue,
+                    nationality_id: nationalityId,
                     updated_at: new Date().toISOString(),
                 })
-                .eq('id', user.id);
+                .select()
+                .single();
 
             if (profileError) throw profileError;
 
@@ -269,17 +310,32 @@ const AccountScreen = () => {
                                 editable={false}
                             />
 
-                            <Text style={styles.label}>Birthdate</Text>
-                            <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.8}>
-                                <View pointerEvents="none">
-                                    <TextInput
-                                        style={styles.input}
-                                        placeholder="Select date"
-                                        value={formatDate(birthdate)}
-                                        editable={false}
+                            <View style={styles.inlineFields}>
+                                <View style={styles.inlineField}>
+                                    <Text style={styles.label}>Birthdate</Text>
+                                    <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.85}>
+                                        <View style={styles.selectField}>
+                                            <Ionicons name="calendar-outline" size={20} color="#D71A28" />
+                                            <Text style={birthdate ? styles.selectValue : styles.selectPlaceholder} numberOfLines={1}>
+                                                {birthdate ? formatBirthdayForDisplay(birthdate) : 'dd/MMMM/yyyy'}
+                                            </Text>
+                                            <Ionicons name="chevron-down" size={18} color="#888" />
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={[styles.inlineField, styles.inlineFieldOffset]}>
+                                    <NationalityPickerField
+                                        compact
+                                        disabled={loadingNationalities || loadingProfile}
+                                        label="Nationality"
+                                        nationalities={nationalities}
+                                        onSelect={setNationalityId}
+                                        selectedId={nationalityId}
+                                        placeholder={loadingNationalities ? 'Loading...' : 'Choose nationality'}
                                     />
                                 </View>
-                            </TouchableOpacity>
+                            </View>
                             {showDatePicker && (
                                 <View style={styles.datePicker}>
                                     <DateTimePicker
@@ -517,6 +573,40 @@ const styles = StyleSheet.create({
     },
     disabledInput: {
         color: '#888',
+    },
+    inlineFields: {
+        flexDirection: 'row',
+        gap: 12,
+        alignItems: 'flex-start',
+    },
+    inlineField: {
+        flex: 1,
+    },
+    inlineFieldOffset: {
+        paddingTop: 12,
+    },
+    selectField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#e5e5e5',
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        backgroundColor: '#f9f9f9',
+        minHeight: 54,
+    },
+    selectValue: {
+        flex: 1,
+        fontSize: 15,
+        color: '#111',
+        fontWeight: '500',
+    },
+    selectPlaceholder: {
+        flex: 1,
+        fontSize: 15,
+        color: '#999',
     },
     passwordRow: {
         position: 'relative',

@@ -103,6 +103,19 @@ export interface Review {
     deleted_at: string | null;
 }
 
+export interface Profile {
+    id: string;
+    email: string | null;
+    full_name: string | null;
+    avatar_url: string | null;
+    birthdate: string | null;
+    nationality_id: string | null;
+    role: string;
+    created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
+}
+
 export interface Itinerary {
     id: string;
     user_id: string | null;

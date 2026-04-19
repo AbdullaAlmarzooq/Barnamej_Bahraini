@@ -269,8 +269,20 @@ NavigationContainer
 
 **Features**:
 - Star rating inputs for 4 categories
+- Guest birthday and nationality capture before review submission
+- Logged-in fallback nationality prompt when the profile is incomplete
 - Name and comment text inputs
 - Local save with sync queue
+
+---
+
+#### `AccountScreen.tsx`
+**Purpose**: Authentication plus profile management for signed-in users
+
+**Features**:
+- Loads stored profile `full_name`, `birthdate`, `email`, and `nationality_id`
+- Lets users edit birthdate and nationality from their mobile profile
+- Persists nationality for future review submissions
 
 ---
 
@@ -437,6 +449,7 @@ Key characteristics:
 - Triggers and functions for ratings and itinerary totals
 - Views for common queries (e.g., attractions with primary photo, itineraries detailed)
 - Relationship tables such as `itinerary_attractions`
+- Profile demographics linked through `profiles.nationality_id -> nationalities.id`
 
 ---
 

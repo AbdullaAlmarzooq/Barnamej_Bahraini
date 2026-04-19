@@ -1,12 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, ScrollView, Alert, TouchableOpacity, Platform } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { createReview } from '@barnamej/supabase-client';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import {
+    calculateAgeFromBirthdate,
+    createReview,
+    formatBirthdayForDisplay,
+    getNationalities,
+    getUserTimeZone,
+    type Nationality,
+} from '@barnamej/supabase-client';
 import { supabase } from '@barnamej/supabase-client';
 import Button from '../components/Button';
 import { useAuth } from '../context/AuthContext';
+import NationalityPickerField from '../components/NationalityPickerField';
 
 const WriteReviewScreen = () => {
     const route = useRoute<any>();
@@ -15,6 +24,11 @@ const WriteReviewScreen = () => {
     const { user } = useAuth();
 
     const [name, setName] = useState('');
+    const [birthdate, setBirthdate] = useState<Date | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [nationalities, setNationalities] = useState<Nationality[]>([]);
+    const [selectedNationalityId, setSelectedNationalityId] = useState<string | null>(null);
+    const [profileNationalityId, setProfileNationalityId] = useState<string | null>(null);
     const [comment, setComment] = useState('');
     const [ratings, setRatings] = useState({
         price: 0,
@@ -24,49 +38,110 @@ const WriteReviewScreen = () => {
     });
 
     useEffect(() => {
-        const loadProfileName = async () => {
-            if (!user) return;
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', user.id)
-                .single();
+        const loadNationalities = async () => {
+            const { data, error } = await getNationalities();
 
             if (error) {
-                console.error('[Profile] load error:', error);
+                console.error('[Nationalities] load error:', error);
                 return;
             }
 
-            setName(data?.full_name || '');
+            setNationalities(data || []);
         };
 
-        loadProfileName();
+        loadNationalities();
+    }, []);
+
+    useEffect(() => {
+        const loadProfile = async () => {
+            if (!user) {
+                setName('');
+                setBirthdate(null);
+                setProfileNationalityId(null);
+                setSelectedNationalityId(null);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name, nationality_id')
+                .eq('id', user.id)
+                .maybeSingle();
+
+            if (error) {
+                console.error('[Profile] load error:', error);
+            }
+
+            const metadata = (user.user_metadata || {}) as Record<string, unknown>;
+            const metadataNationalityId = typeof metadata.nationality_id === 'string' ? metadata.nationality_id : null;
+
+            setName(data?.full_name || (typeof metadata.full_name === 'string' ? metadata.full_name : ''));
+            setProfileNationalityId(data?.nationality_id || metadataNationalityId || null);
+            setSelectedNationalityId(data?.nationality_id || metadataNationalityId || null);
+        };
+
+        loadProfile();
     }, [user]);
 
     const handleRatingChange = (category: keyof typeof ratings, value: number) => {
-        setRatings(prev => ({ ...prev, [category]: value }));
+        setRatings((prev) => ({ ...prev, [category]: value }));
+    };
+
+    const onBirthdateChange = (_event: DateTimePickerEvent, selected?: Date) => {
+        if (Platform.OS !== 'ios') {
+            setShowDatePicker(false);
+        }
+
+        if (selected) {
+            setBirthdate(selected);
+        }
     };
 
     const handleSubmit = async () => {
-        if (!name.trim() || !comment.trim() || Object.values(ratings).some(r => r === 0)) {
+        if ((!user && !name.trim()) || !comment.trim() || Object.values(ratings).some((rating) => rating === 0) || (!user && !birthdate)) {
             Alert.alert('Error', 'Please fill in all fields and provide all ratings.');
+            return;
+        }
+
+        const nationalityId = user ? (profileNationalityId || selectedNationalityId) : selectedNationalityId;
+
+        if (!nationalityId) {
+            Alert.alert('Error', 'Please choose your nationality before submitting a review.');
+            return;
+        }
+
+        const guestAge = !user && birthdate
+            ? calculateAgeFromBirthdate(birthdate, getUserTimeZone())
+            : null;
+
+        if (!user && guestAge == null) {
+            Alert.alert('Error', 'Please choose a valid birthday before submitting your review.');
             return;
         }
 
         try {
             const { error } = await createReview({
                 attraction_id: String(attractionId),
-                reviewer_name: name,
+                reviewer_name: name.trim() || null,
                 price_rating: ratings.price,
                 cleanliness_rating: ratings.cleanliness,
                 service_rating: ratings.service,
                 experience_rating: ratings.experience,
                 comment,
+                age: guestAge,
+                nationality_id: nationalityId,
             }, 'approved');
-            if (error) throw error;
+
+            if (error) {
+                throw error;
+            }
+
+            if (user && !profileNationalityId) {
+                setProfileNationalityId(nationalityId);
+            }
 
             Alert.alert('Success', 'Thank you for your feedback!', [
-                { text: 'OK', onPress: () => navigation.goBack() }
+                { text: 'OK', onPress: () => navigation.goBack() },
             ]);
         } catch (error) {
             Alert.alert('Error', 'Failed to submit review. Please try again.');
@@ -85,7 +160,7 @@ const WriteReviewScreen = () => {
                         activeOpacity={0.7}
                     >
                         <Ionicons
-                            name={star <= ratings[category] ? "star" : "star-outline"}
+                            name={star <= ratings[category] ? 'star' : 'star-outline'}
                             size={32}
                             color="#FFD700"
                             style={styles.star}
@@ -104,13 +179,69 @@ const WriteReviewScreen = () => {
 
                 <View style={styles.form}>
                     {!user && (
+                        <>
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Your Name</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Enter your name"
+                                    value={name}
+                                    onChangeText={setName}
+                                />
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.label}>Your Birthday</Text>
+                                <TouchableOpacity onPress={() => setShowDatePicker(true)} activeOpacity={0.85}>
+                                    <View style={styles.dateField}>
+                                        <Ionicons name="calendar-outline" size={20} color="#D71A28" />
+                                        <Text style={birthdate ? styles.dateValue : styles.datePlaceholder}>
+                                            {birthdate ? formatBirthdayForDisplay(birthdate) : 'dd/MMMM/yyyy'}
+                                        </Text>
+                                        <Ionicons name="chevron-down" size={18} color="#888" />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {showDatePicker && (
+                                    <View style={styles.datePicker}>
+                                        <DateTimePicker
+                                            value={birthdate || new Date(2000, 0, 1)}
+                                            mode="date"
+                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                            onChange={onBirthdateChange}
+                                            maximumDate={new Date()}
+                                        />
+                                        {Platform.OS === 'ios' && (
+                                            <TouchableOpacity style={styles.dateDone} onPress={() => setShowDatePicker(false)}>
+                                                <Text style={styles.dateDoneText}>Done</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+
+                            <View style={styles.inputGroup}>
+                                <NationalityPickerField
+                                    label="Your Nationality"
+                                    nationalities={nationalities}
+                                    onSelect={setSelectedNationalityId}
+                                    selectedId={selectedNationalityId}
+                                    placeholder="Choose nationality"
+                                    helperText="We save your nationality with this guest review."
+                                />
+                            </View>
+                        </>
+                    )}
+
+                    {user && !profileNationalityId && (
                         <View style={styles.inputGroup}>
-                            <Text style={styles.label}>Your Name</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="Enter your name"
-                                value={name}
-                                onChangeText={setName}
+                            <NationalityPickerField
+                                label="Your Nationality"
+                                nationalities={nationalities}
+                                onSelect={setSelectedNationalityId}
+                                selectedId={selectedNationalityId}
+                                placeholder="Choose nationality"
+                                helperText="Add this once and we'll save it to your account for future reviews."
                             />
                         </View>
                     )}
@@ -127,7 +258,7 @@ const WriteReviewScreen = () => {
                             placeholder="Tell us about your visit..."
                             value={comment}
                             onChangeText={setComment}
-                            multiline={true}
+                            multiline
                             numberOfLines={4}
                             textAlignVertical="top"
                         />
@@ -181,6 +312,49 @@ const styles = StyleSheet.create({
     },
     textArea: {
         height: 120,
+    },
+    dateField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        backgroundColor: '#f9f9f9',
+    },
+    dateValue: {
+        flex: 1,
+        fontSize: 16,
+        color: '#1a1a1a',
+        fontWeight: '500',
+    },
+    datePlaceholder: {
+        flex: 1,
+        fontSize: 16,
+        color: '#999',
+    },
+    datePicker: {
+        marginTop: 12,
+        backgroundColor: '#f9f9f9',
+        borderWidth: 1,
+        borderColor: '#e5e5e5',
+        borderRadius: 12,
+        padding: 8,
+    },
+    dateDone: {
+        marginTop: 8,
+        alignSelf: 'flex-end',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: '#D71A28',
+    },
+    dateDoneText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 13,
     },
     starsContainer: {
         flexDirection: 'row',

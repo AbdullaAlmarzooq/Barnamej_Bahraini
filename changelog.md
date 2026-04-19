@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-04-19
+
+### Mobile App (`apps/mobile`)
+
+- Added nationality selection to the logged-in `My Account` profile flow and review submission flow.
+- Fixed profile loading so stored `birthdate` values render correctly again in the mobile account screen.
+- Added guest review nationality capture and saved it with submitted reviews.
+- Added logged-in review fallback prompting for nationality when the profile is incomplete, then saved it back to `profiles`.
+
+### Shared Supabase Client (`packages/supabase-client`)
+
+- Updated review creation to auto-attach `user_id`, `age`, and `nationality_id` for authenticated reviewers.
+- Added shared date helpers for consistent `date` parsing/formatting across mobile profile and review flows.
+- Added `Profile` typing and profile nationality support in the documented schema model.
+
+### Database / Docs
+
+- Added `profiles.nationality_id -> nationalities.id` as a nullable foreign key.
+- Added `idx_profiles_nationality` and documented the profile-to-nationality relationship in `schema.sql`, `docs/database/schema.md`, and `README.md`.
+
 ## 2026-02-22
 
 ### Admin Dashboard (`apps/admin-dashboard`)
