@@ -1,0 +1,176 @@
+.ui-card {
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.ui-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.ui-card-header--borderless {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.ui-card-title {
+    margin: 0;
+    font-size: 1.125rem;
+    line-height: 1.25;
+    color: var(--color-text-primary);
+}
+
+.ui-card-description {
+    margin: var(--space-xs) 0 0;
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+}
+
+.ui-card-content {
+    padding: var(--space-lg);
+}
+
+.ui-card-content--flush {
+    padding-top: 0;
+}
+
+.ui-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
+}
+
+.ui-button {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ui-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.ui-button:focus-visible {
+    outline: 2px solid rgba(215, 26, 40, 0.25);
+    outline-offset: 2px;
+}
+
+.ui-button--default {
+    background-color: var(--color-primary);
+    color: #FFFFFF;
+}
+
+.ui-button--default:hover:not(:disabled) {
+    background-color: var(--color-primary-dark);
+    box-shadow: var(--shadow-sm);
+}
+
+.ui-button--secondary {
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-border-light);
+}
+
+.ui-button--secondary:hover:not(:disabled) {
+    background-color: var(--color-border);
+}
+
+.ui-button--outline {
+    background-color: transparent;
+    color: var(--color-text-primary);
+    border-color: var(--color-border);
+}
+
+.ui-button--outline:hover:not(:disabled) {
+    background-color: var(--color-bg-hover);
+    border-color: var(--color-primary);
+}
+
+.ui-button--ghost {
+    background-color: transparent;
+    color: var(--color-text-primary);
+}
+
+.ui-button--ghost:hover:not(:disabled) {
+    background-color: var(--color-bg-hover);
+}
+
+.ui-button--sm {
+    min-height: 34px;
+    padding: 0 var(--space-md);
+}
+
+.ui-button--default-size {
+    min-height: 40px;
+    padding: 0 var(--space-md);
+}
+
+.ui-button--lg {
+    min-height: 44px;
+    padding: 0 var(--space-lg);
+}
+
+.ui-chart-container {
+    width: 100%;
+    min-height: 220px;
+}
+
+.ui-chart-tooltip {
+    background: #FFFFFF;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-sm) var(--space-md);
+    min-width: 140px;
+    display: grid;
+    gap: var(--space-xs);
+}
+
+.ui-chart-tooltip__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+}
+
+.ui-chart-tooltip__title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    color: var(--color-text-primary);
+    font-weight: 500;
+}
+
+.ui-chart-tooltip__value {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.ui-chart-tooltip__indicator {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}

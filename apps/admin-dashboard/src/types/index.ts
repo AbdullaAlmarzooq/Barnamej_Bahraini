@@ -163,7 +163,7 @@ export interface CategoryRating {
 }
 
 export interface ReviewTrendPoint {
-    week_start: string;
+    period_start: string;
     count: number;
 }
 

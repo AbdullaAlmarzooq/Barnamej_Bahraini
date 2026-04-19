@@ -264,20 +264,18 @@ export async function fetchRatingByCategory(): Promise<CategoryRating[]> {
     }))
 }
 
-function startOfWeek(date: Date) {
+function startOfMonth(date: Date) {
     const result = new Date(date)
-    const day = result.getUTCDay() // 0 = Sunday
-    const diff = (day + 6) % 7 // shift so Monday is start
-    result.setUTCDate(result.getUTCDate() - diff)
+    result.setUTCDate(1)
     result.setUTCHours(0, 0, 0, 0)
     return result
 }
 
-export async function fetchReviewTrend(weeks = 8): Promise<ReviewTrendPoint[]> {
+export async function fetchReviewTrend(months = 8): Promise<ReviewTrendPoint[]> {
     const now = new Date()
-    const endWeek = startOfWeek(now)
-    const start = new Date(endWeek)
-    start.setUTCDate(start.getUTCDate() - (weeks - 1) * 7)
+    const currentMonth = startOfMonth(now)
+    const start = new Date(currentMonth)
+    start.setUTCMonth(start.getUTCMonth() - (months - 1))
 
     const { data, error } = await supabase
         .from('reviews')
@@ -291,16 +289,16 @@ export async function fetchReviewTrend(weeks = 8): Promise<ReviewTrendPoint[]> {
     const counts = new Map<string, number>()
     for (const row of data || []) {
         const createdAt = new Date(row.created_at)
-        const weekStart = startOfWeek(createdAt).toISOString()
-        counts.set(weekStart, (counts.get(weekStart) || 0) + 1)
+        const monthStart = startOfMonth(createdAt).toISOString()
+        counts.set(monthStart, (counts.get(monthStart) || 0) + 1)
     }
 
     const points: ReviewTrendPoint[] = []
-    for (let i = 0; i < weeks; i++) {
-        const week = new Date(start)
-        week.setUTCDate(start.getUTCDate() + i * 7)
-        const key = week.toISOString()
-        points.push({ week_start: key, count: counts.get(key) || 0 })
+    for (let i = 0; i < months; i++) {
+        const month = new Date(start)
+        month.setUTCMonth(start.getUTCMonth() + i)
+        const key = month.toISOString()
+        points.push({ period_start: key, count: counts.get(key) || 0 })
     }
 
     return points

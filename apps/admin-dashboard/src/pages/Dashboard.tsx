@@ -1,10 +1,49 @@
 import { useState, useEffect } from 'react';
 import { fetchStatistics, fetchRatingByCategory, fetchReviewTrend } from '../api/client';
 import { type Statistics, type CategoryRating, type ReviewTrendPoint } from '../types';
-import StatCard from '../components/Common/StatCard';
 import { IconAttractions, IconDashboard, IconItineraries, IconReviews } from '../components/Common/LineIcons';
+import ChartCard from '../components/Dashboard/ChartCard';
+import EmptyState from '../components/Dashboard/EmptyState';
+import QuickActionCard from '../components/Dashboard/QuickActionCard';
+import ReviewTrendInteractiveChart from '../components/Dashboard/ReviewTrendInteractiveChart';
+import SectionCard from '../components/Dashboard/SectionCard';
+import StatCard from '../components/Dashboard/StatCard';
 import UserDemographics from '../components/Dashboard/UserDemographics';
 import './Dashboard.css';
+
+const REVIEW_TREND_MONTHS = 8;
+
+function startOfUtcMonth(date: Date): Date {
+    const result = new Date(date);
+    result.setUTCDate(1);
+    result.setUTCHours(0, 0, 0, 0);
+    return result;
+}
+
+function normalizeReviewTrend(points: ReviewTrendPoint[], months = REVIEW_TREND_MONTHS): ReviewTrendPoint[] {
+    const countsByMonth = new Map<string, number>();
+    for (const point of points) {
+        const monthStart = startOfUtcMonth(new Date(point.period_start)).toISOString();
+        countsByMonth.set(monthStart, (countsByMonth.get(monthStart) || 0) + point.count);
+    }
+
+    const latestMonth = startOfUtcMonth(new Date());
+    const firstMonth = new Date(latestMonth);
+    firstMonth.setUTCMonth(firstMonth.getUTCMonth() - (months - 1));
+
+    const normalized: ReviewTrendPoint[] = [];
+    for (let i = 0; i < months; i++) {
+        const monthStart = new Date(firstMonth);
+        monthStart.setUTCMonth(firstMonth.getUTCMonth() + i);
+        const key = monthStart.toISOString();
+        normalized.push({
+            period_start: key,
+            count: countsByMonth.get(key) || 0,
+        });
+    }
+
+    return normalized;
+}
 
 const Dashboard = () => {
     const [stats, setStats] = useState<Statistics | null>(null);
@@ -24,11 +63,11 @@ const Dashboard = () => {
             const [statsData, categoryData, trendData] = await Promise.all([
                 fetchStatistics(),
                 fetchRatingByCategory(),
-                fetchReviewTrend(8)
+                fetchReviewTrend(REVIEW_TREND_MONTHS)
             ]);
             setStats(statsData);
             setCategoryRatings(categoryData);
-            setReviewTrend(trendData);
+            setReviewTrend(normalizeReviewTrend(trendData, REVIEW_TREND_MONTHS));
         } catch (err) {
             setError('Failed to load statistics');
             console.error(err);
@@ -39,7 +78,7 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <div className="loading-container">
+            <div className="loading-container dashboard-loading-state">
                 <div className="spinner"></div>
             </div>
         );
@@ -47,150 +86,152 @@ const Dashboard = () => {
 
     if (error) {
         return (
-            <div className="error-message">
-                {error}
+            <div className="dashboard-page">
+                <SectionCard title="Dashboard Overview" subtitle="Unable to load the latest dashboard metrics.">
+                    <EmptyState
+                        title="Data couldn't be loaded"
+                        description={error}
+                        actionLabel="Try again"
+                        onAction={loadStatistics}
+                    />
+                </SectionCard>
             </div>
         );
     }
 
+    const statItems = [
+        {
+            title: 'Total Attractions',
+            value: stats?.total_attractions || 0,
+            icon: <IconAttractions />,
+        },
+        {
+            title: 'Total Reviews',
+            value: stats?.total_reviews || 0,
+            icon: <IconReviews />,
+        },
+        {
+            title: 'Total Itineraries',
+            value: stats?.total_itineraries || 0,
+            icon: <IconItineraries />,
+        },
+        {
+            title: 'Average Rating',
+            value: stats?.average_rating?.toFixed(1) || '0.0',
+            icon: <IconDashboard />,
+        },
+    ];
+
+    const quickActions = [
+        {
+            to: '/admin/attractions',
+            title: 'Manage Attractions',
+            description: 'Add, edit, or remove attractions',
+            icon: <IconAttractions />,
+        },
+        {
+            to: '/admin/reviews',
+            title: 'Moderate Reviews',
+            description: 'View and manage user reviews',
+            icon: <IconReviews />,
+        },
+        {
+            to: '/admin/itineraries',
+            title: 'View Itineraries',
+            description: 'Browse user itineraries',
+            icon: <IconItineraries />,
+        },
+    ];
+
+    const sortedCategoryRatings = categoryRatings
+        .slice()
+        .sort((a, b) => b.average_rating - a.average_rating);
+
     return (
-        <div className="dashboard">
-            <div className="dashboard-header">
-                <h1>Dashboard Overview</h1>
-                <p className="text-muted">Welcome to the Barnamej Bahraini Admin Dashboard</p>
-            </div>
+        <div className="dashboard-page">
+            <header className="dashboard-page__header">
+                <h1 className="dashboard-page__title">Dashboard Overview</h1>
+                <p className="dashboard-page__subtitle text-muted">Welcome to the Barnamej Bahraini Admin Dashboard</p>
+            </header>
 
-            <div className="stats-grid">
-                <StatCard
-                    title="Total Attractions"
-                    value={stats?.total_attractions || 0}
-                    icon={<IconAttractions />}
-                />
-                <StatCard
-                    title="Total Reviews"
-                    value={stats?.total_reviews || 0}
-                    icon={<IconReviews />}
-                />
-                <StatCard
-                    title="Total Itineraries"
-                    value={stats?.total_itineraries || 0}
-                    icon={<IconItineraries />}
-                />
-                <StatCard
-                    title="Average Rating"
-                    value={stats?.average_rating?.toFixed(1) || '0.0'}
-                    icon={<IconDashboard />}
-                />
-            </div>
+            <section className="dashboard-grid dashboard-grid--stats" aria-label="Top statistics">
+                {statItems.map((item) => (
+                    <StatCard key={item.title} title={item.title} value={item.value} icon={item.icon} />
+                ))}
+            </section>
 
-            <div className="dashboard-content">
-                <div className="dashboard-charts">
-                    <div className="card">
-                        <div className="card-header">
-                            <h2 className="card-title">Rating Quality by Category</h2>
+            <section className="dashboard-grid dashboard-grid--charts" aria-label="Performance and quality charts">
+                <ChartCard
+                    title="Rating Quality by Category"
+                    subtitle="Average ratings across attraction categories"
+                >
+                    {sortedCategoryRatings.length === 0 ? (
+                        <div className="dashboard-chart-empty">
+                            <EmptyState
+                                title="No ratings available"
+                                description="Rating data will appear here once categories receive reviews."
+                                compact
+                            />
                         </div>
-                        <div className="chart-body">
-                            {categoryRatings.length === 0 ? (
-                                <div className="text-muted">No rating data available yet.</div>
-                            ) : (
-                                <div className="bar-list">
-                                    {categoryRatings
-                                        .slice()
-                                        .sort((a, b) => b.average_rating - a.average_rating)
-                                        .map(item => (
-                                            <div className="bar-row" key={item.category}>
-                                                <div className="bar-label">
-                                                    {item.category}
-                                                    <span className="bar-subtext">
-                                                        {item.total_reviews} reviews
-                                                    </span>
-                                                </div>
-                                                <div className="bar-track">
-                                                    <div
-                                                        className="bar-fill"
-                                                        style={{ width: `${Math.min(100, (item.average_rating / 5) * 100)}%` }}
-                                                    />
-                                                </div>
-                                                <div className="bar-value">
-                                                    {item.average_rating.toFixed(1)}
-                                                </div>
-                                            </div>
-                                        ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="card">
-                        <div className="card-header">
-                            <h2 className="card-title">Review Recency Trend (Last 8 Weeks)</h2>
-                        </div>
-                        <div className="chart-body">
-                            {reviewTrend.length === 0 ? (
-                                <div className="text-muted">No review activity yet.</div>
-                            ) : (
-                                <div className="trend-chart">
-                                    <svg viewBox="0 0 320 120" role="img" aria-label="Review trend line">
-                                        <polyline
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="3"
-                                            points={(() => {
-                                                const max = Math.max(...reviewTrend.map(p => p.count), 1)
-                                                const span = Math.max(reviewTrend.length - 1, 1)
-                                                return reviewTrend
-                                                    .map((point, index) => {
-                                                        const x = (index / span) * 300 + 10
-                                                        const y = 100 - (point.count / max) * 80 + 10
-                                                        return `${x},${y}`
-                                                    })
-                                                    .join(' ')
-                                            })()}
-                                        />
-                                    </svg>
-                                    <div className="trend-labels">
-                                        {reviewTrend.map(point => {
-                                            const date = new Date(point.week_start)
-                                            const label = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date)
-                                            return (
-                                                <div key={point.week_start} className="trend-label">
-                                                    <span className="trend-count">{point.count}</span>
-                                                    <span className="trend-date">{label}</span>
-                                                </div>
-                                            )
-                                        })}
+                    ) : (
+                        <div className="dashboard-chart-bar-list">
+                            {sortedCategoryRatings.map((item) => (
+                                <div className="dashboard-chart-bar-row" key={item.category}>
+                                    <div className="dashboard-chart-bar-label">
+                                        {item.category}
+                                        <span className="dashboard-chart-bar-subtext">
+                                            {item.total_reviews} reviews
+                                        </span>
                                     </div>
+                                    <div className="dashboard-chart-bar-track">
+                                        <div
+                                            className="dashboard-chart-bar-fill"
+                                            style={{ width: `${Math.min(100, (item.average_rating / 5) * 100)}%` }}
+                                        />
+                                    </div>
+                                    <div className="dashboard-chart-bar-value">{item.average_rating.toFixed(1)}</div>
                                 </div>
-                            )}
+                            ))}
                         </div>
-                    </div>
-                </div>
+                    )}
+                </ChartCard>
 
-                <UserDemographics />
+                <ChartCard
+                    title="Review Recency Trend (Last 8 Months)"
+                    subtitle="Monthly review submissions over the latest window"
+                >
+                    {reviewTrend.length === 0 ? (
+                        <div className="dashboard-chart-empty">
+                            <EmptyState
+                                title="No review activity"
+                                description="Review volume by month will appear once new reviews are submitted."
+                                compact
+                            />
+                        </div>
+                    ) : (
+                        <ReviewTrendInteractiveChart data={reviewTrend} />
+                    )}
+                </ChartCard>
+            </section>
 
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="card-title">Quick Actions</h2>
-                    </div>
-                    <div className="quick-actions">
-                        <a href="/attractions" className="action-card">
-                            <div className="action-icon"><IconAttractions /></div>
-                            <div className="action-title">Manage Attractions</div>
-                            <div className="action-description">Add, edit, or remove attractions</div>
-                        </a>
-                        <a href="/reviews" className="action-card">
-                            <div className="action-icon"><IconReviews /></div>
-                            <div className="action-title">Moderate Reviews</div>
-                            <div className="action-description">View and manage user reviews</div>
-                        </a>
-                        <a href="/itineraries" className="action-card">
-                            <div className="action-icon"><IconItineraries /></div>
-                            <div className="action-title">View Itineraries</div>
-                            <div className="action-description">Browse user itineraries</div>
-                        </a>
-                    </div>
+            <UserDemographics />
+
+            <SectionCard
+                title="Quick Actions"
+                subtitle="Common admin tasks to jump into moderation and content management"
+            >
+                <div className="dashboard-grid dashboard-grid--actions">
+                    {quickActions.map((action) => (
+                        <QuickActionCard
+                            key={action.title}
+                            to={action.to}
+                            title={action.title}
+                            description={action.description}
+                            icon={action.icon}
+                        />
+                    ))}
                 </div>
-            </div>
+            </SectionCard>
         </div>
     );
 };

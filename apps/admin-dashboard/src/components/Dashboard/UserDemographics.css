@@ -2,8 +2,8 @@
     margin-bottom: var(--space-xl);
 }
 
-.user-demographics-header {
-    gap: var(--space-md);
+.user-demographics-card .dashboard-section-card__header {
+    align-items: flex-start;
 }
 
 .user-demographics-summary {
@@ -56,7 +56,7 @@
 
 .pie-chart-layout {
     display: grid;
-    grid-template-columns: minmax(150px, 180px) 1fr;
+    grid-template-columns: minmax(220px, 280px) 1fr;
     gap: var(--space-lg);
     align-items: center;
 }
@@ -69,8 +69,14 @@
 
 .pie-chart {
     width: 100%;
-    max-width: 180px;
-    height: auto;
+    max-width: 260px;
+    height: 260px;
+    min-height: 260px;
+}
+
+.pie-chart .recharts-responsive-container {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 .pie-chart-total {
