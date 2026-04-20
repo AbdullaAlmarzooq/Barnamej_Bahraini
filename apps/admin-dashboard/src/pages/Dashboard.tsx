@@ -4,7 +4,6 @@ import { type Statistics, type CategoryRating, type ReviewTrendPoint } from '../
 import { IconAttractions, IconDashboard, IconItineraries, IconReviews } from '../components/Common/LineIcons';
 import ChartCard from '../components/Dashboard/ChartCard';
 import EmptyState from '../components/Dashboard/EmptyState';
-import QuickActionCard from '../components/Dashboard/QuickActionCard';
 import ReviewTrendInteractiveChart from '../components/Dashboard/ReviewTrendInteractiveChart';
 import SectionCard from '../components/Dashboard/SectionCard';
 import StatCard from '../components/Dashboard/StatCard';
@@ -122,27 +121,6 @@ const Dashboard = () => {
         },
     ];
 
-    const quickActions = [
-        {
-            to: '/admin/attractions',
-            title: 'Manage Attractions',
-            description: 'Add, edit, or remove attractions',
-            icon: <IconAttractions />,
-        },
-        {
-            to: '/admin/reviews',
-            title: 'Moderate Reviews',
-            description: 'View and manage user reviews',
-            icon: <IconReviews />,
-        },
-        {
-            to: '/admin/itineraries',
-            title: 'View Itineraries',
-            description: 'Browse user itineraries',
-            icon: <IconItineraries />,
-        },
-    ];
-
     const sortedCategoryRatings = categoryRatings
         .slice()
         .sort((a, b) => b.average_rating - a.average_rating);
@@ -215,23 +193,6 @@ const Dashboard = () => {
             </section>
 
             <UserDemographics />
-
-            <SectionCard
-                title="Quick Actions"
-                subtitle="Common admin tasks to jump into moderation and content management"
-            >
-                <div className="dashboard-grid dashboard-grid--actions">
-                    {quickActions.map((action) => (
-                        <QuickActionCard
-                            key={action.title}
-                            to={action.to}
-                            title={action.title}
-                            description={action.description}
-                            icon={action.icon}
-                        />
-                    ))}
-                </div>
-            </SectionCard>
         </div>
     );
 };
