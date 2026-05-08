@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
     fetchAttractions,
+    fetchAttraction,
     deleteAttraction,
-    createAttraction,
     updateAttraction,
 } from '../api/client';
 import { fetchAttractionPhotos, uploadAttractionPhoto, deleteAttractionPhoto, setPrimaryPhoto, getPhotoUrl } from '../api/photos'
@@ -111,10 +111,16 @@ const Attractions = () => {
     };
 
     const handleEdit = async (attraction: Attraction) => {
-        setEditingAttraction(attraction);
         setIsModalOpen(true);
-        // Load photos for this attraction
-        await loadPhotos(attraction.id);
+        try {
+            const freshAttraction = await fetchAttraction(attraction.id);
+            setEditingAttraction(freshAttraction);
+            await loadPhotos(attraction.id);
+        } catch (err) {
+            setIsModalOpen(false);
+            alert('Failed to load attraction');
+            console.error(err);
+        }
     };
 
     const handleAdd = () => {
@@ -129,6 +135,7 @@ const Attractions = () => {
 
         if (!editingAttraction) return;
 
+        const hasReviews = (editingAttraction.total_reviews || 0) > 0;
 
         const attractionData = {
             name: formData.get('name') as string,
@@ -136,7 +143,12 @@ const Attractions = () => {
             category: (formData.get('category') as string).toLowerCase() as AttractionCategory,
             location: formData.get('location') as string,
             price: parseFloat(formData.get('price') as string) || 0,
-            avg_rating: parseFloat(formData.get('rating') as string) || 0,
+            estimated_duration_minutes: formData.get('estimated_duration_minutes')
+                ? parseInt(formData.get('estimated_duration_minutes') as string, 10)
+                : null,
+            avg_rating: hasReviews
+                ? editingAttraction.avg_rating
+                : parseFloat(formData.get('rating') as string) || 0,
             is_active: true,
         };
 
@@ -388,6 +400,7 @@ const Attractions = () => {
                             max="5"
                             step="0.1"
                             defaultValue={editingAttraction?.avg_rating || 0}
+                            disabled={(editingAttraction?.total_reviews || 0) > 0}
                         />
                     </div>
 
@@ -401,6 +414,19 @@ const Attractions = () => {
                             min="0"
                             step="0.01"
                             defaultValue={editingAttraction?.price || 0}
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="label">Estimated Duration (minutes)</label>
+                        <input
+                            type="number"
+                            name="estimated_duration_minutes"
+                            className="input"
+                            placeholder="e.g., 90"
+                            min="1"
+                            step="1"
+                            defaultValue={editingAttraction?.estimated_duration_minutes || ''}
                         />
                     </div>
                     {/* Photo Gallery Section - Only show when editing */}

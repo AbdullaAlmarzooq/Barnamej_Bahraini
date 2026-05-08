@@ -21,7 +21,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 const ItineraryDetailsScreen = () => {
     const route = useRoute<any>();
     const navigation = useNavigation<any>();
-    const { itineraryId } = route.params;
+    const { itineraryId, source } = route.params;
     const { user } = useAuth();
 
     const [itinerary, setItinerary] = useState<any>(null);
@@ -81,7 +81,7 @@ const ItineraryDetailsScreen = () => {
     };
 
     const isOwner = itinerary?.user_id && user?.id === itinerary.user_id;
-    const canEdit = isOwner && !itinerary?.is_public;
+    const canEdit = isOwner && source === 'my';
 
     const loadData = async () => {
         setIsLoading(true);
@@ -195,6 +195,38 @@ const ItineraryDetailsScreen = () => {
         return `${displayHours}:${minutes} ${period}`;
     };
 
+    const formatTimeForDisplay = (value: string | null | undefined) => {
+        const date = parseTimeToDate(value);
+        return date ? formatTime(date) : '--:--';
+    };
+
+    const formatTimeForDatabase = (date: Date | null) => {
+        if (!date) return null;
+        const hours = `${date.getHours()}`.padStart(2, '0');
+        const minutes = `${date.getMinutes()}`.padStart(2, '0');
+        return `${hours}:${minutes}:00`;
+    };
+
+    const showUpdateAttractionError = (error: any) => {
+        const message = error?.message || '';
+        console.error(error);
+
+        if (message.includes('Time overlap detected')) {
+            Alert.alert(
+                'Schedule Conflict',
+                'This attraction overlaps with another scheduled stop. Please choose a different start or end time.'
+            );
+            return;
+        }
+
+        if (message.includes('Scheduled itineraries require start and end times')) {
+            Alert.alert('Missing Times', 'Please select start and end times for this scheduled stop.');
+            return;
+        }
+
+        Alert.alert('Error', 'Failed to update details.');
+    };
+
     const getScheduledDuration = () => {
         if (!itinerary?.attractions || itinerary.attractions.length === 0) return null;
         const times = itinerary.attractions
@@ -260,8 +292,8 @@ const ItineraryDetailsScreen = () => {
         if (!editingItem) return;
         try {
             const { error } = await updateItineraryAttraction(String(editingItem.link_id), {
-                scheduled_start_time: startTime || null,
-                scheduled_end_time: endTime || null,
+                scheduled_start_time: startTime ? formatTimeForDatabase(parseTimeToDate(startTime)) : null,
+                scheduled_end_time: endTime ? formatTimeForDatabase(parseTimeToDate(endTime)) : null,
                 custom_price: price ? parseFloat(price) : null,
                 notes: notes || null,
             });
@@ -269,7 +301,7 @@ const ItineraryDetailsScreen = () => {
             setEditingItem(null);
             loadData();
         } catch (error) {
-            Alert.alert('Error', 'Failed to update details.');
+            showUpdateAttractionError(error);
         }
     };
 
@@ -427,7 +459,11 @@ const ItineraryDetailsScreen = () => {
                             </View>
                             <TouchableOpacity
                                 style={styles.cardMain}
-                                onPress={() => navigation.navigate('Attractions', { screen: 'AttractionDetails', params: { attractionId: item.id } })}
+                                onPress={() => navigation.navigate('AttractionDetails', {
+                                    attractionId: item.id,
+                                    origin: 'itinerary',
+                                    itineraryId,
+                                })}
                                 activeOpacity={0.8}
                             >
                                 <Image
@@ -442,7 +478,7 @@ const ItineraryDetailsScreen = () => {
                                     <View style={styles.cardMeta}>
                                         <Text style={styles.category}>{item.category}</Text>
                                         <Text style={styles.timeText}>
-                                            {item.start_time || '--:--'} - {item.end_time || '--:--'}
+                                            {formatTimeForDisplay(item.start_time)} - {formatTimeForDisplay(item.end_time)}
                                         </Text>
                                     </View>
                                     {item.price ? (
@@ -670,7 +706,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 10,
         marginBottom: 10,
-        padding: 10,
+        padding: 13,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
@@ -686,7 +722,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#D71A28',
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 10,
+        marginRight: 13,
     },
     cardNumberText: {
         color: '#fff',
@@ -699,10 +735,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     image: {
-        width: 50,
-        height: 50,
+        width: 63,
+        height: 63,
         borderRadius: 6,
-        marginRight: 10,
+        marginRight: 13,
     },
     cardContent: {
         flex: 1,
@@ -735,14 +771,14 @@ const styles = StyleSheet.create({
     actions: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
+        gap: 5,
     },
     actionButton: {
-        padding: 6,
+        padding: 8,
     },
     reorderButtons: {
         flexDirection: 'column',
-        marginRight: 4,
+        marginRight: 5,
     },
     disabledButton: {
         opacity: 0.3,

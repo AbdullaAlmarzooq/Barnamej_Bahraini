@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-05-08
+
+### Mobile App (`apps/mobile`)
+
+- Changed the Account tab auth hierarchy so Sign In is the default screen and Sign Up is the secondary option.
+- Allowed itinerary creators to edit their own public itineraries when opened from `My Itineraries`.
+- Kept Community itinerary detail views read-only, even for the creator's own public itineraries.
+- Added scheduled-stop start/end time selection when adding an attraction to a scheduled itinerary.
+- Normalized scheduled stop writes to `HH:mm:ss` values for Supabase `time` columns.
+- Added user-friendly mobile alerts for scheduled itinerary time overlaps and missing scheduled times.
+- Improved itinerary detail attraction cards with 12-hour time display, larger touch rows, larger thumbnails, and more balanced spacing.
+- Fixed itinerary-origin attraction navigation so back returns to the same itinerary detail screen instead of the Attractions tab.
+
+### Admin Dashboard (`apps/admin-dashboard`)
+
+- Updated the Edit Attraction modal to fetch the latest attraction row before showing editable fields.
+- Added `estimated_duration_minutes` display/edit support in the Edit Attraction modal.
+- Locked the `Initial Rating (0-5)` field after an attraction has reviews, preserving database-computed review ratings.
+
+### Shared Supabase Client (`packages/supabase-client`)
+
+- Removed the public-itinerary reorder guard so owner edit permissions can be controlled by the mobile route context instead of `is_public` alone.
+
 ## 2026-04-19
 
 ### Admin Dashboard (`apps/admin-dashboard`)

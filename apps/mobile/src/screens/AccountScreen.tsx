@@ -162,7 +162,7 @@ const ActionButton = ({
 
 const AccountScreen = () => {
     const { user, signOut } = useAuth();
-    const [mode, setMode] = useState<AuthMode>('signup');
+    const [mode, setMode] = useState<AuthMode>('login');
 
     const [authFullName, setAuthFullName] = useState('');
     const [authEmail, setAuthEmail] = useState('');
@@ -869,7 +869,7 @@ const AccountScreen = () => {
                                 <Text style={styles.switchText}>
                                     {mode === 'signup'
                                         ? 'Already have an account? Log in'
-                                        : "Don't have an account? Sign up"}
+                                        : "Don't have an account? Sign Up"}
                                 </Text>
                             </TouchableOpacity>
                         </SectionCard>

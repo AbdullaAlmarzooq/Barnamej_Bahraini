@@ -34,6 +34,8 @@ const ItinerariesStackNavigator = () => {
         <ItinerariesStack.Navigator screenOptions={{ headerShown: false }}>
             <ItinerariesStack.Screen name="ItineraryList" component={ItineraryListScreen} options={{ title: 'My Itineraries' }} />
             <ItinerariesStack.Screen name="ItineraryDetails" component={ItineraryDetailsScreen} options={{ headerShown: false }} />
+            <ItinerariesStack.Screen name="AttractionDetails" component={AttractionDetailsScreen} options={{ title: 'Details', headerShown: true }} />
+            <ItinerariesStack.Screen name="WriteReview" component={WriteReviewScreen} options={{ title: 'Write Review', headerShown: true }} />
         </ItinerariesStack.Navigator>
     );
 };

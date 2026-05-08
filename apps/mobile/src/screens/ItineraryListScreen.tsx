@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { getItineraries, getUserItineraries, createItinerary, addAttractionToItinerary, supabase } from '@barnamej/supabase-client';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/Button';
@@ -17,6 +18,9 @@ const ItineraryListScreen = () => {
     const [newItineraryName, setNewItineraryName] = useState('');
     const [newItineraryDesc, setNewItineraryDesc] = useState('');
     const [isPublic, setIsPublic] = useState(false);
+    const [schedulingItinerary, setSchedulingItinerary] = useState<any>(null);
+    const [scheduledStartTime, setScheduledStartTime] = useState<Date | null>(null);
+    const [scheduledEndTime, setScheduledEndTime] = useState<Date | null>(null);
 
     // Check if we are in "Add to Itinerary" mode
     const addToItineraryId = route.params?.addToItineraryId;
@@ -26,6 +30,43 @@ const ItineraryListScreen = () => {
         const hrs = Math.floor(minutes / 60);
         const mins = minutes % 60;
         return `${hrs > 0 ? `${hrs}h ` : ''}${mins}m`;
+    };
+
+    const isScheduledItinerary = (itinerary: any) => {
+        const mode = itinerary?.mode ?? itinerary?.itinerary_mode;
+        return mode === 'scheduled' || itinerary?.auto_sort_enabled === true;
+    };
+
+    const formatTimeForDatabase = (date: Date) => {
+        const hours = `${date.getHours()}`.padStart(2, '0');
+        const minutes = `${date.getMinutes()}`.padStart(2, '0');
+        return `${hours}:${minutes}:00`;
+    };
+
+    const showAddToItineraryError = (error: any) => {
+        const message = error?.message || '';
+        console.error(error);
+
+        if (message.includes('Time overlap detected')) {
+            Alert.alert(
+                'Schedule Conflict',
+                'This attraction overlaps with another scheduled stop. Please choose a different start or end time.'
+            );
+            return;
+        }
+
+        if (message.includes('Scheduled itineraries require start and end times')) {
+            Alert.alert('Missing Times', 'Please select start and end times before adding this attraction.');
+            return;
+        }
+
+        Alert.alert('Error', 'Failed to add to itinerary.');
+    };
+
+    const closeScheduleModal = () => {
+        setSchedulingItinerary(null);
+        setScheduledStartTime(null);
+        setScheduledEndTime(null);
     };
 
     useFocusEffect(
@@ -95,7 +136,30 @@ const ItineraryListScreen = () => {
 
         // Navigate to details
         console.log('NAVIGATING to ItineraryDetails with itineraryId:', itinerary.id);
-        navigation.navigate('ItineraryDetails', { itineraryId: itinerary.id });
+        navigation.navigate('ItineraryDetails', {
+            itineraryId: itinerary.id,
+            source: activeTab,
+        });
+    };
+
+    const finishAddToItinerary = async (itinerary: any, startTime?: Date | null, endTime?: Date | null) => {
+        const { error } = await addAttractionToItinerary({
+            itinerary_id: String(itinerary.id),
+            attraction_id: String(addToItineraryId),
+            scheduled_start_time: startTime ? formatTimeForDatabase(startTime) : undefined,
+            scheduled_end_time: endTime ? formatTimeForDatabase(endTime) : undefined,
+        });
+        if (error) throw error;
+        closeScheduleModal();
+        Alert.alert('Success', 'Attraction added to itinerary!', [
+            {
+                text: 'OK',
+                onPress: () => {
+                    navigation.setParams({ addToItineraryId: undefined });
+                    navigation.goBack();
+                }
+            }
+        ]);
     };
 
     const handleAddToItinerary = async (itinerary: any) => {
@@ -117,23 +181,50 @@ const ItineraryListScreen = () => {
                 return;
             }
 
-            const { error } = await addAttractionToItinerary({
-                itinerary_id: String(itinerary.id),
-                attraction_id: String(addToItineraryId),
-            });
-            if (error) throw error;
-            Alert.alert('Success', 'Attraction added to itinerary!', [
-                {
-                    text: 'OK',
-                    onPress: () => {
-                        navigation.setParams({ addToItineraryId: undefined });
-                        navigation.goBack();
-                    }
-                }
-            ]);
+            if (isScheduledItinerary(itinerary)) {
+                const defaultStart = new Date();
+                const defaultEnd = new Date(defaultStart.getTime() + 60 * 60 * 1000);
+                setScheduledStartTime(defaultStart);
+                setScheduledEndTime(defaultEnd);
+                setSchedulingItinerary(itinerary);
+                return;
+            }
+
+            await finishAddToItinerary(itinerary);
         } catch (error) {
-            Alert.alert('Error', 'Failed to add to itinerary.');
-            console.error(error);
+            showAddToItineraryError(error);
+        }
+    };
+
+    const handleScheduledStartChange = (_event: DateTimePickerEvent, selected?: Date) => {
+        if (selected) {
+            setScheduledStartTime(selected);
+        }
+    };
+
+    const handleScheduledEndChange = (_event: DateTimePickerEvent, selected?: Date) => {
+        if (selected) {
+            setScheduledEndTime(selected);
+        }
+    };
+
+    const handleConfirmScheduledAdd = async () => {
+        if (!schedulingItinerary) return;
+
+        if (!scheduledStartTime || !scheduledEndTime) {
+            Alert.alert('Missing Times', 'Please select start and end times for this scheduled stop.');
+            return;
+        }
+
+        if (scheduledEndTime <= scheduledStartTime) {
+            Alert.alert('Invalid Times', 'End time must be after start time.');
+            return;
+        }
+
+        try {
+            await finishAddToItinerary(schedulingItinerary, scheduledStartTime, scheduledEndTime);
+        } catch (error) {
+            showAddToItineraryError(error);
         }
     };
 
@@ -262,6 +353,58 @@ const ItineraryListScreen = () => {
                             <Button
                                 title="Create"
                                 onPress={handleCreateItinerary}
+                                style={{ flex: 1, marginLeft: 8 }}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={!!schedulingItinerary}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={closeScheduleModal}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Schedule Stop</Text>
+                        <Text style={styles.scheduleHelper}>
+                            This itinerary is scheduled, so this attraction needs a start and end time.
+                        </Text>
+
+                        <Text style={styles.timeLabel}>Start Time</Text>
+                        <View style={styles.inlinePickerFrame}>
+                            <DateTimePicker
+                                value={scheduledStartTime || new Date()}
+                                mode="time"
+                                display="spinner"
+                                style={styles.inlineTimePicker}
+                                onChange={handleScheduledStartChange}
+                            />
+                        </View>
+
+                        <Text style={styles.timeLabel}>End Time</Text>
+                        <View style={styles.inlinePickerFrame}>
+                            <DateTimePicker
+                                value={scheduledEndTime || scheduledStartTime || new Date()}
+                                mode="time"
+                                display="spinner"
+                                style={styles.inlineTimePicker}
+                                onChange={handleScheduledEndChange}
+                            />
+                        </View>
+
+                        <View style={styles.modalButtons}>
+                            <Button
+                                title="Cancel"
+                                onPress={closeScheduleModal}
+                                variant="secondary"
+                                style={{ flex: 1, marginRight: 8 }}
+                            />
+                            <Button
+                                title="Add"
+                                onPress={handleConfirmScheduledAdd}
                                 style={{ flex: 1, marginLeft: 8 }}
                             />
                         </View>
@@ -421,6 +564,27 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginBottom: 16,
         color: '#1a1a1a',
+    },
+    scheduleHelper: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    timeLabel: {
+        fontSize: 14,
+        color: '#333',
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    inlinePickerFrame: {
+        height: 118,
+        marginBottom: 16,
+        overflow: 'hidden',
+        justifyContent: 'center',
+    },
+    inlineTimePicker: {
+        height: 118,
     },
     input: {
         borderWidth: 1,

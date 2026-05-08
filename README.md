@@ -241,9 +241,10 @@ NavigationContainer
 - Tab switching (My Itineraries / Community)
 - Modal for creating new itinerary
 - "Add to Itinerary" mode for adding attractions
+- Scheduled-stop time picker when adding attractions to scheduled itineraries
 - Public/private toggle switch
 
-**Special Mode**: When navigated with `addToItineraryId` param, clicking an itinerary adds the attraction to it.
+**Special Mode**: When navigated with `addToItineraryId` param, clicking an itinerary adds the attraction to it. Scheduled itineraries require start and end times before the attraction can be added.
 
 ---
 
@@ -256,11 +257,13 @@ NavigationContainer
 - Manual reorder via Move Up/Down buttons
 - Auto-sort toggle (sorts by start_time)
 - Delete itinerary functionality
+- Source-aware edit mode: itineraries opened from `My Itineraries` are editable by the owner; itineraries opened from `Community` are view-only
+- Attraction details opened from itinerary cards stay inside the Itineraries navigation stack so back returns to the same itinerary detail screen
 
 **Reordering Logic**: 
-- Manual mode: Up/Down buttons visible
+- Manual mode: Up/Down buttons visible for owner views opened from `My Itineraries`
 - Auto-sort mode: Attractions sorted by `start_time`, untimed items at end
-- Public itineraries: Reordering disabled
+- Community tab views are read-only even for the creator's public itineraries
 
 ---
 
@@ -280,6 +283,7 @@ NavigationContainer
 **Purpose**: Authentication plus profile management for signed-in users
 
 **Features**:
+- Shows Sign In first by default, with Sign Up available as the secondary auth option
 - Loads stored profile `full_name`, `birthdate`, `email`, and `nationality_id`
 - Lets users edit birthdate and nationality together from the mobile profile form
 - Keeps password updates in a separate section on the same screen
@@ -424,6 +428,12 @@ export const getPhotosForAttraction = (attractionId: number) => { ... };
 | Reviews | `/reviews` | View and moderate user reviews |
 | Itineraries | `/itineraries` | View and manage user itineraries |
 
+### Attractions Management
+
+- The Edit Attraction modal fetches the latest attraction row before populating the form.
+- Admins can update `estimated_duration_minutes`, which is used by flexible itinerary duration totals.
+- `Initial Rating (0-5)` is editable only while an attraction has no reviews; once reviews exist, ratings are controlled by review aggregation.
+
 ### Dashboard Statistics
 Displays:
 - Total Attractions count
@@ -514,10 +524,13 @@ const API_BASE_URL = __DEV__
 
 #### 5. Configure Supabase Environment
 
-Set the following environment variables (e.g., in a `.env` file):
+Set the following environment variables for the mobile app (e.g., in a root `.env.local` file):
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+Use `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for projects where legacy anon keys are disabled. `EXPO_PUBLIC_SUPABASE_ANON_KEY` is kept only as a fallback for older Supabase projects. Expo only exposes environment variables prefixed with `EXPO_PUBLIC_` to the app bundle. Restart Expo after changing these values.
 
 #### 6. Start the Backend Server
 
@@ -571,8 +584,9 @@ Terminal 3 (Dashboard):  cd apps/admin-dashboard && npm run dev
 | Location | Setting | Description |
 |----------|---------|-------------|
 | `apps/mobile/src/services/api.ts` | `API_BASE_URL` | Backend server URL |
-| `.env` | `SUPABASE_URL` | Supabase project URL |
-| `.env` | `SUPABASE_ANON_KEY` | Supabase anon public key |
+| Root `.env.local` | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL for the mobile app |
+| Root `.env.local` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key for the mobile app |
+| Root `.env.local` | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Legacy Supabase anon key fallback |
 | `legacy-server/index.js` | `PORT` | Server port (default: 3000) |
 | `app.json` | Various | Expo app configuration |
 

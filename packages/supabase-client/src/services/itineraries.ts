@@ -220,15 +220,11 @@ export async function updateItineraryAttraction(
  * Reorder attractions in an itinerary
  */
 export async function reorderItineraryAttractions(itineraryId: string, orderedIds: string[]) {
-    // Check if itinerary is public (reordering disabled for public)
     const { data: itinerary } = await getItinerary(itineraryId);
 
     const mode = (itinerary as any)?.mode ?? (itinerary as any)?.itinerary_mode;
     const isAuto = mode === 'auto';
 
-    if (itinerary?.is_public) {
-        return { success: false, error: new Error('Cannot reorder a public itinerary') };
-    }
     if (isAuto) {
         return { success: false, error: new Error('Cannot reorder an auto itinerary') };
     }
